@@ -1,5 +1,5 @@
 import { desc, eq } from "drizzle-orm";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { chatSession } from "@/db/schema";
 import { env } from "@/lib/env";
 
@@ -9,6 +9,7 @@ const leagueKey = () => env.leagueId || "demo";
 
 export async function GET() {
   try {
+    const db = getDb();
     const rows = await db
       .select()
       .from(chatSession)
@@ -25,6 +26,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const db = getDb();
   let title = "New conversation";
   try {
     const body = await req.json();

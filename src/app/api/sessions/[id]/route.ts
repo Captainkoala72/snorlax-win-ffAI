@@ -1,5 +1,5 @@
 import { asc, eq } from "drizzle-orm";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { chatMessage, chatSession } from "@/db/schema";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +8,7 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const db = getDb();
   const { id } = await params;
   const sessionId = Number(id);
   if (!Number.isFinite(sessionId)) {
@@ -32,6 +33,7 @@ export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const db = getDb();
   const { id } = await params;
   const sessionId = Number(id);
   if (!Number.isFinite(sessionId)) {

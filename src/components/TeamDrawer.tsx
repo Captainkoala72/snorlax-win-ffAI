@@ -34,25 +34,23 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 export function TeamDrawer({ team, currentWeek, onClose, onInsertTeam }: TeamDrawerProps) {
-  const [detail, setDetail] = useState<TeamDetail | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<{
+    teamName: string;
+    detail: TeamDetail | null;
+  } | null>(null);
 
   useEffect(() => {
-    if (!team) {
-      setDetail(null);
-      return;
-    }
+    if (!team) return;
+
     let cancelled = false;
-    setLoading(true);
-    setDetail(null);
+    const teamName = team.name;
     fetch(`/api/league/team?name=${encodeURIComponent(team.name)}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (!cancelled && d?.team) setDetail(d.team);
+        if (!cancelled) setResult({ teamName, detail: d?.team ?? null });
       })
-      .catch(() => undefined)
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+      .catch(() => {
+        if (!cancelled) setResult({ teamName, detail: null });
       });
     return () => {
       cancelled = true;
@@ -60,6 +58,9 @@ export function TeamDrawer({ team, currentWeek, onClose, onInsertTeam }: TeamDra
   }, [team]);
 
   if (!team) return null;
+
+  const detail = result?.teamName === team.name ? result.detail : null;
+  const loading = result?.teamName !== team.name;
 
   return (
     <div className="fixed inset-0 z-50">

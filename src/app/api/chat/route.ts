@@ -1,5 +1,5 @@
 import { asc, eq } from "drizzle-orm";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { chatMessage, chatSession } from "@/db/schema";
 import { MissingApiKeyError, runChat } from "@/lib/ai/client";
 import { buildSystemPrompt, type ChatMessage } from "@/lib/ai/prompt";
@@ -64,6 +64,7 @@ export async function POST(req: Request) {
 
       try {
         if (!userMessage) throw new Error("Message cannot be empty.");
+        const db = getDb();
 
         // ---- Session: create if needed, scope to the active league ----
         if (sessionId === 0) {
