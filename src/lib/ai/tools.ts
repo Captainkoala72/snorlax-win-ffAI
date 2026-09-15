@@ -1,4 +1,4 @@
-// OpenAI-compatible function tools exposed to Muse Spark 1.3.
+// OpenAI-compatible function tools exposed to GLM-5.3-Flash.
 // Every tool is backed by live ESPN league data or public ESPN news/search.
 
 import { findTeam, getLeagueData } from "../espn/client";
@@ -134,6 +134,9 @@ function matchupView(league: Awaited<ReturnType<typeof getLeagueData>>, week: nu
 
 export async function executeTool(name: string, args: any): Promise<string> {
   const league = await getLeagueData();
+  if (!["search_web", "get_player_news"].includes(name) && league.status !== "ok" && league.status !== "demo") {
+    throw new Error(league.errorMessage ?? "ESPN league is unavailable");
+  }
 
   switch (name) {
     case "get_league_overview": {
@@ -249,6 +252,7 @@ export async function executeTool(name: string, args: any): Promise<string> {
           details: n.description,
           published: n.published,
           source: n.source,
+          url: n.url,
         })),
       );
     }

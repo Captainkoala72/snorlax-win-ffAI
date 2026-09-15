@@ -74,7 +74,7 @@ function errorLeague(
 ): LeagueData {
   return {
     id: Number(env.leagueId) || 0,
-    name: "Wine League",
+    name: "Degenerates With Integrity Fantasy Assistant",
     season: env.season,
     size: 0,
     currentWeek: 1,
@@ -89,6 +89,9 @@ function errorLeague(
 }
 
 async function fetchRawLeague(): Promise<any> {
+  if (!/^\d+$/.test(env.leagueId) || !Number.isInteger(env.season) || env.season < 2018) {
+    throw new Error("Set LEAGUE_ID to a numeric ESPN league ID and SEASON_YEAR to a season from 2018 onward.");
+  }
   const url = new URL(
     `${ESPN_BASE}/seasons/${env.season}/segments/0/leagues/${encodeURIComponent(env.leagueId)}`,
   );
@@ -96,19 +99,36 @@ async function fetchRawLeague(): Promise<any> {
 
   const headers: Record<string, string> = { Accept: "application/json" };
   if (env.swid || env.espnS2) {
+    if (!env.swid || !env.espnS2) throw new EspnAuthError();
     headers["Cookie"] =
-      `swid=${encodeURIComponent(env.swid)}; espn_s2=${encodeURIComponent(env.espnS2)}`;
+      `SWID=${cookieValue(env.swid)}; espn_s2=${cookieValue(env.espnS2)}`;
   }
 
   const res = await fetch(url.toString(), {
     headers,
-    // ISR-style revalidation; private-league responses are safe to cache briefly.
-    next: { revalidate: 300 },
+    cache: "no-store",
+    redirect: "manual",
+    signal: AbortSignal.timeout(20000),
   });
   if (res.status === 401 || res.status === 403) throw new EspnAuthError();
+  if (res.status >= 300 && res.status < 400) throw new EspnAuthError();
   if (res.status === 404) throw new EspnNotFoundError();
   if (!res.ok) throw new Error(`ESPN responded with HTTP ${res.status}.`);
-  return res.json() as Promise<any>;
+  if (!res.headers.get("content-type")?.includes("json")) {
+    throw new Error("ESPN returned a non-JSON response. Check league visibility and refresh the ESPN cookies.");
+  }
+  const raw = await res.json();
+  if (!raw || Array.isArray(raw) || !Array.isArray(raw.teams) || raw.teams.length === 0) {
+    throw new Error("ESPN returned no league teams. Check LEAGUE_ID, SEASON_YEAR and private-league access.");
+  }
+  return raw;
+}
+
+function cookieValue(value: string): string {
+  const cookie = value.trim().replace(/^(["'])(.*)\1$/, "$2");
+  if (/[\r\n;\s]/.test(cookie)) throw new Error("Enter only the ESPN cookie value, without its name or other cookies.");
+  // Preserve browser cookie percent escapes exactly; do not encode a second time.
+  return cookie;
 }
 
 function round1(n: unknown): number {
@@ -130,11 +150,11 @@ function normalizeLeague(raw: any): LeagueData {
     .filter((m): m is LeagueMatchup => m !== null);
 
   const receptionItem = (raw?.settings?.scoringSettings?.scoringItems as any[] | undefined)
-    ?.find((it) => String(it?.id ?? "").toLowerCase().includes("reception"));
+    ?.find((it) => Number(it?.statId ?? it?.id) === 53);
 
   return {
     id: Number(raw?.id ?? env.leagueId) || 0,
-    name: (raw?.settings?.name as string) || (raw?.name as string) || "Wine League",
+    name: (raw?.settings?.name as string) || (raw?.name as string) || "Degenerates With Integrity Fantasy Assistant",
     season: Number(raw?.seasonId ?? env.season) || env.season,
     size: Number(raw?.settings?.size ?? teams.length) || teams.length,
     currentWeek: Number(raw?.status?.currentMatchupPeriod ?? 1),
@@ -189,8 +209,8 @@ function normalizeTeam(t: any, members: Map<string, any>): LeagueTeam | null {
     wins: Number(t?.record?.overall?.wins ?? 0),
     losses: Number(t?.record?.overall?.losses ?? 0),
     ties: Number(t?.record?.overall?.ties ?? 0),
-    pointsFor: round1(t?.points),
-    pointsAgainst: round1(t?.pointsAgainst),
+    pointsFor: round1(t?.record?.overall?.pointsFor ?? t?.points),
+    pointsAgainst: round1(t?.record?.overall?.pointsAgainst ?? t?.pointsAgainst),
     streakType: t?.streak?.type === "WIN" || t?.streak?.type === "LOSS" || t?.streak?.type === "TIE"
       ? t.streak.type
       : null,

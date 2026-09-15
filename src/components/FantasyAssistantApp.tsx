@@ -12,14 +12,14 @@ import { Welcome } from "./Welcome";
 import { Composer } from "./Composer";
 import { TeamDrawer } from "./TeamDrawer";
 
-export function WineLeagueApp({ initial }: { initial: ClientLeague }) {
+export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
   const [league, setLeague] = useState<ClientLeague>(initial);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
   const [sessionTitle, setSessionTitle] = useState<string>("");
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [effort, setEffort] = useState<ReasoningEffort>("xhigh");
+  const [effort, setEffort] = useState<ReasoningEffort>("max");
   const [webSearch, setWebSearch] = useState(true);
   const [input, setInput] = useState("");
   const [activeTeamId, setActiveTeamId] = useState<number | null>(null);
@@ -174,7 +174,7 @@ export function WineLeagueApp({ initial }: { initial: ClientLeague }) {
     if (refreshing) return;
     setRefreshing(true);
     try {
-      const res = await fetch("/api/league", { cache: "no-store" });
+      const res = await fetch("/api/league?refresh=1", { cache: "no-store" });
       if (res.ok) setLeague(await res.json());
     } catch {
       // keep stale data
@@ -359,6 +359,7 @@ export function WineLeagueApp({ initial }: { initial: ClientLeague }) {
           webSearch={webSearch}
           activeTeam={activeTeam}
           teams={league.teams}
+          leagueStatus={league.league.status}
           currentWeek={league.league.currentWeek}
           onSend={() => send()}
           onInsertTeam={insertTeam}

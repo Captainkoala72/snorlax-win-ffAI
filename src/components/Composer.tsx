@@ -23,6 +23,7 @@ interface ComposerProps {
   activeTeam: TeamSummary | null;
   teams: TeamSummary[];
   currentWeek: number;
+  leagueStatus: string;
   onSend: () => void;
   onInsertTeam: (t: TeamSummary) => void;
   onClearActiveTeam: () => void;
@@ -211,7 +212,7 @@ export function Composer(props: ComposerProps) {
         </div>
 
         <p className="mt-2.5 text-center text-[0.65rem] text-faint">
-          Wine League AI · muse-spark-1.3 · Live ESPN data ·{" "}
+          Degenerates With Integrity Fantasy Assistant · glm-5.3-flash · {props.leagueStatus === "demo" ? "Sample data" : props.leagueStatus === "ok" ? "Live ESPN data" : "ESPN offline"} ·{" "}
           <span className="text-muted">{teams.length} teams</span>
         </p>
       </div>

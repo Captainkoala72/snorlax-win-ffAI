@@ -81,6 +81,6 @@ export const LEAGUE_PROMPTS: LeaguePrompt[] = [
     label: "Latest NFL news impact",
     icon: Newspaper,
     build: () =>
-      `What is the most important NFL news right now, and how does it impact the Wine League?`,
+      `What is the most important NFL news right now, and how does it impact the Degenerates With Integrity Fantasy Assistant?`,
   },
 ];

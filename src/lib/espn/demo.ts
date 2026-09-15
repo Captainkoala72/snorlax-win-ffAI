@@ -282,7 +282,7 @@ export function buildDemoLeague(season = 2026, now = new Date()): LeagueData {
 
   return {
     id: -1,
-    name: "Wine League",
+    name: "Degenerates With Integrity Fantasy Assistant",
     season,
     size: 12,
     currentWeek,

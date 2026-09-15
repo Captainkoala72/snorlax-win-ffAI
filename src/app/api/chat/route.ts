@@ -23,7 +23,7 @@ function asEffort(v: unknown): ReasoningEffort {
     const found = REASONING_EFFORTS.find((e) => e.id === v);
     if (found) return found.id;
   }
-  return "xhigh";
+  return "max";
 }
 
 function truncateTitle(message: string): string {
@@ -33,11 +33,11 @@ function truncateTitle(message: string): string {
 
 function friendlyError(err: unknown): string {
   if (err instanceof MissingApiKeyError) {
-    return "Muse Spark 1.3 is not connected yet. Add META_API_KEY to your environment secrets to start chatting.";
+    return "GLM-5.3-Flash is not connected yet. Add ZAI_API_KEY to your environment secrets to start chatting.";
   }
   if (err instanceof Error) {
     if (err.message.includes("fetch failed") || err.message.includes("ECONNREFUSED")) {
-      return "Could not reach the Muse Spark API. Check your connection and MUSE_SPARK_BASE_URL.";
+      return "Could not reach the GLM-5.3-Flash API. Check your connection to api.z.ai.";
     }
     return err.message;
   }
@@ -142,7 +142,7 @@ export async function POST(req: Request) {
         });
 
         if (!answer || !answer.trim()) {
-          throw new Error("Muse Spark returned an empty response. Please try again.");
+          throw new Error("GLM-5.3-Flash returned an empty response. Please try again.");
         }
 
         const assistantMsg: ChatMessage = { role: "assistant", content: answer };
