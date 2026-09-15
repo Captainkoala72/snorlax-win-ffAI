@@ -10,7 +10,7 @@ import {
   Sparkles,
   Trash2,
   Users,
-  Wine,
+  Beer,
   X,
 } from "lucide-react";
 import type { ClientLeague, TeamSummary } from "@/lib/serialize";
@@ -37,7 +37,7 @@ function Brand() {
   return (
     <div className="flex items-center gap-3 px-1 pt-2">
       <div className="relative grid size-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-wine to-wine-deep shadow-[0_8px_24px_rgba(168,50,71,0.35)]">
-        <Wine className="size-5 text-ink" strokeWidth={1.8} />
+        <Beer className="size-5 text-ink" strokeWidth={1.8} />
         <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-gold ring-2 ring-base" />
       </div>
       <div className="min-w-0">
@@ -310,5 +310,4 @@ export function Sidebar(props: SidebarProps) {
     </>
   );
 }
-
 

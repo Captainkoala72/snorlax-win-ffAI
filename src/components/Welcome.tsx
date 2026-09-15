@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Sparkles, Wine, Zap } from "lucide-react";
+import { ArrowRight, Beer, Sparkles, Zap } from "lucide-react";
 import type { ClientLeague, MatchupSummary, TeamSummary } from "@/lib/serialize";
 import { LEAGUE_PROMPTS } from "@/lib/prompts";
 
@@ -139,7 +139,7 @@ export function Welcome({
       {/* Team-aware prompt hint */}
       {activeTeam && (
         <div className="animate-pop mx-auto flex items-center gap-2 rounded-full border border-wine/50 bg-wine/[0.12] px-4 py-2 text-[0.8rem] text-ink">
-          <Wine className="size-3.5 text-wine-bright" />
+          <Beer className="size-3.5 text-wine-bright" />
           {activeTeam.name} selected — try a team prompt from the sidebar.
         </div>
       )}

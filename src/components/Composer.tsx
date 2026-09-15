@@ -7,7 +7,7 @@ import {
   type KeyboardEvent,
   type RefObject,
 } from "react";
-import { ArrowUp, Globe, Loader2, SendHorizonal, Sparkles, Wine, X } from "lucide-react";
+import { ArrowUp, Beer, Globe, Loader2, SendHorizonal, Sparkles, X } from "lucide-react";
 import type { TeamSummary } from "@/lib/serialize";
 import type { ReasoningEffort } from "@/lib/env";
 import { TEAM_PROMPTS } from "@/lib/prompts";
@@ -97,7 +97,7 @@ export function Composer(props: ComposerProps) {
               className="group flex items-center gap-1.5 rounded-lg border border-wine/60 bg-wine/[0.14] py-1 pl-2.5 pr-1.5 text-[0.72rem] font-semibold text-ink transition-colors hover:border-wine-bright"
               title="Clear selected team"
             >
-              <Wine className="size-3 text-wine-bright" />
+              <Beer className="size-3 text-wine-bright" />
               <span className="max-w-[160px] truncate">{activeTeam.name}</span>
               <X className="size-3 text-muted group-hover:text-ink" />
             </button>
@@ -155,7 +155,7 @@ export function Composer(props: ComposerProps) {
               className="flex items-center gap-1.5 rounded-lg border border-line bg-white/[0.03] px-2 py-1.5 text-[0.7rem] font-medium text-muted transition-colors hover:border-wine/50 hover:text-ink"
               title="Insert a team name"
             >
-              <Wine className="size-3.5 text-wine-bright" />
+              <Beer className="size-3.5 text-wine-bright" />
               Teams
             </button>
 
