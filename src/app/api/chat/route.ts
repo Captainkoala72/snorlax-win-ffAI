@@ -1,22 +1,18 @@
-import { asc, eq } from "drizzle-orm";
-import { getDb } from "@/db";
-import { chatMessage, chatSession } from "@/db/schema";
 import { MissingApiKeyError, runChat } from "@/lib/ai/client";
 import { buildSystemPrompt, type ChatMessage } from "@/lib/ai/prompt";
 import { executeTool, TOOL_DEFS } from "@/lib/ai/tools";
+import { sanitizeHistory } from "@/lib/chat-history";
 import { env, REASONING_EFFORTS, type ReasoningEffort } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 interface ChatRequestBody {
-  sessionId?: number | string;
+  history?: unknown;
   message?: string;
   reasoningEffort?: string;
   webSearch?: boolean;
 }
-
-const leagueKey = () => env.leagueId || "demo";
 
 function asEffort(v: unknown): ReasoningEffort {
   if (typeof v === "string") {
@@ -24,11 +20,6 @@ function asEffort(v: unknown): ReasoningEffort {
     if (found) return found.id;
   }
   return "max";
-}
-
-function truncateTitle(message: string): string {
-  const clean = message.replace(/\s+/g, " ").trim();
-  return clean.length > 48 ? `${clean.slice(0, 48)}…` : clean || "New conversation";
 }
 
 function friendlyError(err: unknown): string {
@@ -59,65 +50,11 @@ export async function POST(req: Request) {
         );
       };
 
-      let sessionId = Number(body.sessionId);
-      if (!Number.isFinite(sessionId) || sessionId <= 0) sessionId = 0;
-
       try {
         if (!userMessage) throw new Error("Message cannot be empty.");
-        const db = getDb();
-
-        // ---- Session: create if needed, scope to the active league ----
-        if (sessionId === 0) {
-          const [row] = await db
-            .insert(chatSession)
-            .values({ title: truncateTitle(userMessage), leagueId: leagueKey() })
-            .returning();
-          sessionId = row.id;
-        } else {
-          const [existing] = await db
-            .select()
-            .from(chatSession)
-            .where(eq(chatSession.id, sessionId));
-          if (!existing) {
-            const [row] = await db
-              .insert(chatSession)
-              .values({ title: truncateTitle(userMessage), leagueId: leagueKey() })
-              .returning();
-            sessionId = row.id;
-          }
-        }
-
-        send("start", { sessionId, model: env.model, effort });
-
-        // ---- History ----
-        const historyRows = await db
-          .select()
-          .from(chatMessage)
-          .where(eq(chatMessage.sessionId, sessionId))
-          .orderBy(asc(chatMessage.id));
-
-        const history: ChatMessage[] = [];
-        for (const row of historyRows) {
-          const d = row.data as Partial<ChatMessage> | null;
-          if (
-            d &&
-            typeof d === "object" &&
-            typeof d.role === "string" &&
-            ["user", "assistant", "tool", "system"].includes(d.role) &&
-            typeof d.content === "string"
-          ) {
-            history.push(d as ChatMessage);
-          }
-        }
-
-        // ---- Persist the incoming user turn ----
+        send("start", { model: env.model, effort });
+        const history = sanitizeHistory(body.history);
         const userMsg: ChatMessage = { role: "user", content: userMessage };
-        await db.insert(chatMessage).values({
-          sessionId,
-          role: "user",
-          data: userMsg,
-        });
-
         const systemPrompt = await buildSystemPrompt();
         const messages: ChatMessage[] = [
           { role: "system", content: systemPrompt },
@@ -145,20 +82,9 @@ export async function POST(req: Request) {
           throw new Error("GLM-5.3-Flash returned an empty response. Please try again.");
         }
 
-        const assistantMsg: ChatMessage = { role: "assistant", content: answer };
-        await db.insert(chatMessage).values({
-          sessionId,
-          role: "assistant",
-          data: assistantMsg,
-        });
-        await db
-          .update(chatSession)
-          .set({ updatedAt: new Date() })
-          .where(eq(chatSession.id, sessionId));
-
         send("done", { ok: true });
       } catch (err) {
-        send("error", { message: friendlyError(err), sessionId });
+        send("error", { message: friendlyError(err) });
       } finally {
         controller.close();
       }
@@ -168,7 +94,7 @@ export async function POST(req: Request) {
   return new Response(stream, {
     headers: {
       "Content-Type": "text/event-stream; charset=utf-8",
-      "Cache-Control": "no-cache, no-transform",
+      "Cache-Control": "no-store, no-transform",
       Connection: "keep-alive",
       "X-Accel-Buffering": "no",
     },
