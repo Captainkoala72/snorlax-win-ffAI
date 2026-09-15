@@ -2,15 +2,17 @@
 
 import {
   AlertTriangle,
+  Beer,
   Check,
   ChevronRight,
+  Copy,
   Database,
   Globe,
   Loader2,
   Newspaper,
   Trophy,
-  Wine,
 } from "lucide-react";
+import { useState } from "react";
 import type { UiMessage, UiToolCall } from "@/lib/chat-ui";
 import { toolSummary } from "@/lib/ai/tools";
 import { Markdown } from "./Markdown";
@@ -18,7 +20,7 @@ import { Markdown } from "./Markdown";
 const TOOL_ICONS: Record<string, typeof Database> = {
   get_league_overview: Trophy,
   list_teams: Database,
-  get_team: Wine,
+  get_team: Beer,
   get_matchups: Database,
   get_standings: Trophy,
   get_player_news: Newspaper,
@@ -67,10 +69,30 @@ function TypingDots() {
 
 function AssistantMessage({ message }: { message: UiMessage }) {
   const hasContent = message.content.length > 0;
+  const [copied, setCopied] = useState(false);
+
+  const copyText = async () => {
+    try {
+      await navigator.clipboard.writeText(message.content);
+    } catch {
+      const fallback = document.createElement("textarea");
+      fallback.value = message.content;
+      fallback.style.position = "fixed";
+      fallback.style.opacity = "0";
+      document.body.appendChild(fallback);
+      fallback.select();
+      const copiedWithFallback = document.execCommand("copy");
+      fallback.remove();
+      if (!copiedWithFallback) return;
+    }
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1800);
+  };
+
   return (
     <div className="animate-fade-up flex gap-3.5">
       <div className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-wine to-wine-deep shadow-[0_4px_16px_rgba(168,50,71,0.3)]">
-        <Wine className="size-4 text-ink" strokeWidth={1.8} />
+        <Beer className="size-4 text-ink" strokeWidth={1.8} />
       </div>
       <div className="min-w-0 flex-1">
         {message.toolCalls && message.toolCalls.length > 0 && (
@@ -92,6 +114,17 @@ function AssistantMessage({ message }: { message: UiMessage }) {
         ) : null}
         {message.streaming && hasContent && (
           <span className="ml-1 inline-block size-3.5 animate-blink rounded-sm bg-wine-bright align-middle" />
+        )}
+        {hasContent && !message.streaming && (
+          <button
+            type="button"
+            onClick={copyText}
+            className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-line bg-white/[0.03] px-2 py-1 text-[0.68rem] font-semibold uppercase tracking-wide text-muted transition-colors hover:border-wine/60 hover:text-ink"
+            aria-label="Copy assistant response"
+          >
+            {copied ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
+            {copied ? "Copied" : "Copy text"}
+          </button>
         )}
       </div>
     </div>

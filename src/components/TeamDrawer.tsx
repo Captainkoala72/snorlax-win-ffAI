@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowUpRight, TrendingUp, Users, Wine, X } from "lucide-react";
+import { ArrowUpRight, Beer, TrendingUp, Users, X } from "lucide-react";
 import type { TeamSummary } from "@/lib/serialize";
 
 interface TeamDrawerProps {
@@ -71,7 +71,7 @@ export function TeamDrawer({ team, currentWeek, onClose, onInsertTeam }: TeamDra
             className="mt-1 grid size-11 shrink-0 place-items-center rounded-xl text-ink"
             style={{ background: `linear-gradient(135deg, ${team.color}, #3a1320)` }}
           >
-            <Wine className="size-5" strokeWidth={1.8} />
+            <Beer className="size-5" strokeWidth={1.8} />
           </span>
           <div className="min-w-0 flex-1">
             <h2 className="font-display text-xl font-semibold leading-tight">{team.name}</h2>

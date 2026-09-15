@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, Globe, Menu, RefreshCw, Sparkles, Wine } from "lucide-react";
+import { Beer, Check, ChevronDown, Globe, Menu, RefreshCw, Sparkles } from "lucide-react";
 import type { ClientLeague } from "@/lib/serialize";
 import { REASONING_EFFORTS, type ReasoningEffort } from "@/lib/env";
 
@@ -147,7 +147,7 @@ export function ChatHeader(props: ChatHeaderProps) {
 
       <div className="flex min-w-0 flex-1 items-center gap-2.5">
         <div className="hidden size-8 place-items-center rounded-lg bg-gradient-to-br from-wine to-wine-deep sm:grid">
-          <Wine className="size-4 text-ink" strokeWidth={1.8} />
+          <Beer className="size-4 text-ink" strokeWidth={1.8} />
         </div>
         <div className="min-w-0">
           <h1 className="truncate text-[0.95rem] font-semibold text-ink">{title}</h1>
