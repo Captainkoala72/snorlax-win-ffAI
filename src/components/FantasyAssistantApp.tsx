@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReasoningEffort } from "@/lib/env";
 import type { ClientLeague, TeamSummary } from "@/lib/serialize";
 import { LEAGUE_PROMPTS, TEAM_PROMPTS } from "@/lib/prompts";
-import { parseSse, safeParseJson, type SessionSummary, type UiMessage, type UiToolCall } from "@/lib/chat-ui";
+import { parseSse, type UiMessage, type UiToolCall } from "@/lib/chat-ui";
+import { readChats, writeChats, chatStorageKey, type LocalChat } from "@/lib/local-chats";
 import { Sidebar } from "./Sidebar";
 import { ChatHeader } from "./ChatHeader";
 import { MessageList } from "./MessageList";
@@ -14,7 +15,7 @@ import { TeamDrawer } from "./TeamDrawer";
 
 export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
   const [league, setLeague] = useState<ClientLeague>(initial);
-  const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const [sessions, setSessions] = useState<LocalChat[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
   const [sessionTitle, setSessionTitle] = useState<string>("");
   const [messages, setMessages] = useState<UiMessage[]>([]);
@@ -27,6 +28,11 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
   const [drawerTeamId, setDrawerTeamId] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  const [storageWarning, setStorageWarning] = useState("");
+  const [storageReady, setStorageReady] = useState(false);
+  const chatsRef = useRef<LocalChat[]>([]);
+  const storageKey = chatStorageKey(initial.league.id, initial.league.season);
+
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const nearBottomRef = useRef(true);
@@ -34,16 +40,36 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
   const activeTeam = league.teams.find((t) => t.id === activeTeamId) ?? null;
   const drawerTeam = league.teams.find((t) => t.id === drawerTeamId) ?? null;
 
-  const refreshSessions = useCallback(() => {
-    fetch("/api/sessions")
-      .then((r) => r.json())
-      .then((d) => setSessions(Array.isArray(d.sessions) ? d.sessions : []))
-      .catch(() => undefined);
-  }, []);
+  useEffect(() => {
+    try {
+      const saved = readChats(localStorage, storageKey);
+      chatsRef.current = saved;
+      // Hydrate browser-only external storage after server rendering.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSessions(saved);
+    } catch {
+      setStorageWarning("Browser storage is unavailable. Chats will last only until this page closes.");
+    }
+    setStorageReady(true);
+  }, [storageKey]);
+
+  const saveChats = useCallback((chats: LocalChat[]) => {
+    chatsRef.current = chats;
+    setSessions(chats);
+    try {
+      writeChats(localStorage, storageKey, chats);
+      setStorageWarning("");
+    } catch {
+      setStorageWarning("Could not save chats in this browser. Storage may be full or disabled; this chat remains available until the page closes.");
+    }
+  }, [storageKey]);
 
   useEffect(() => {
-    refreshSessions();
-  }, [refreshSessions]);
+    if (!storageReady || isStreaming || activeSessionId === null || messages.length === 0) return;
+    const previous = chatsRef.current.find((s) => s.id === activeSessionId);
+    if (!previous) return;
+    saveChats([{ ...previous, messages, updatedAt: new Date().toISOString() }, ...chatsRef.current.filter((s) => s.id !== activeSessionId)]);
+  }, [messages, isStreaming, activeSessionId, storageReady, saveChats]);
 
   // Auto-scroll while streaming (only if the user is near the bottom).
   useEffect(() => {
@@ -115,60 +141,21 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
     setSidebarOpen(false);
   }, [isStreaming]);
 
-  const selectSession = useCallback(
-    async (id: number) => {
-      if (isStreaming) return;
-      try {
-        const res = await fetch(`/api/sessions/${id}`);
-        if (!res.ok) return;
-        const d = await res.json();
-        const msgs: UiMessage[] = [];
-        for (const m of d.messages ?? []) {
-          const data = m?.data;
-          if (!data || typeof data !== "object") continue;
-          if (data.role === "user" && typeof data.content === "string") {
-            msgs.push({ key: `m-${m.id}`, role: "user", content: data.content });
-          } else if (data.role === "assistant") {
-            const toolCalls: UiToolCall[] = Array.isArray(data.tool_calls)
-              ? data.tool_calls.map((tc: any, i: number) => ({
-                  id: tc?.id ?? `tc-${i}`,
-                  name: tc?.function?.name ?? "tool",
-                  args: safeParseJson(tc?.function?.arguments),
-                  status: "ok" as const,
-                }))
-              : [];
-            msgs.push({
-              key: `m-${m.id}`,
-              role: "assistant",
-              content: typeof data.content === "string" ? data.content : "",
-              toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-            });
-          }
-          // tool rows are represented through their parent assistant message
-        }
-        setMessages(msgs);
-        setActiveSessionId(id);
-        setSessionTitle(d.session?.title ?? "");
-        setSidebarOpen(false);
-      } catch {
-        // session load failed silently
-      }
-    },
-    [isStreaming],
-  );
+  const selectSession = useCallback((id: number) => {
+    if (isStreaming) return;
+    const chat = chatsRef.current.find((s) => s.id === id);
+    if (!chat) return;
+    setMessages(chat.messages);
+    setActiveSessionId(id);
+    setSessionTitle(chat.title);
+    setSidebarOpen(false);
+  }, [isStreaming]);
 
-  const deleteSession = useCallback(
-    async (id: number) => {
-      try {
-        await fetch(`/api/sessions/${id}`, { method: "DELETE" });
-      } catch {
-        // best effort
-      }
-      setSessions((prev) => prev.filter((s) => s.id !== id));
-      if (activeSessionId === id) newChat();
-    },
-    [activeSessionId, newChat],
-  );
+  const deleteSession = useCallback((id: number) => {
+    if (isStreaming) return;
+    saveChats(chatsRef.current.filter((s) => s.id !== id));
+    if (activeSessionId === id) newChat();
+  }, [isStreaming, saveChats, activeSessionId, newChat]);
 
   const refreshLeague = useCallback(async () => {
     if (refreshing) return;
@@ -186,11 +173,20 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
   const send = useCallback(
     async (raw?: string) => {
       const text = (raw ?? input).trim();
-      if (!text || isStreaming) return;
+      if (!text || isStreaming || !storageReady) return;
       setIsStreaming(true);
       setInput("");
       setSidebarOpen(false);
       nearBottomRef.current = true;
+
+      const now = new Date().toISOString();
+      const id = activeSessionId ?? Math.max(Date.now(), ...chatsRef.current.map((s) => s.id + 1));
+      const title = sessionTitle || text.replace(/\s+/g, " ").slice(0, 48);
+      setActiveSessionId(id);
+      setSessionTitle(title);
+      saveChats([{ id, title, createdAt: chatsRef.current.find((s) => s.id === id)?.createdAt ?? now, updatedAt: now,
+        messages: [...messages, { key: crypto.randomUUID(), role: "user", content: text }],
+      }, ...chatsRef.current.filter((s) => s.id !== id)]);
 
       const assistantKey = `a-${Date.now()}`;
       setMessages((prev) => [
@@ -210,7 +206,7 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            sessionId: activeSessionId ?? undefined,
+            history: messages.filter((m) => !m.error && !m.streaming && (m.role === "user" || m.role === "assistant")).map(({ role, content }) => ({ role, content })),
             message: text,
             reasoningEffort: effort,
             webSearch,
@@ -236,11 +232,6 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
               const { event, data } = parseSse(chunk);
               if (!data) continue;
               switch (event) {
-                case "start":
-                  if (typeof data.sessionId === "number") {
-                    setActiveSessionId(data.sessionId);
-                  }
-                  break;
                 case "delta":
                   if (typeof data.delta === "string" && data.delta) {
                     patch((m) => ({ ...m, content: m.content + data.delta }));
@@ -293,10 +284,9 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
           content: failed ? (m.content ? `${m.content}\n\n${failureReason}` : failureReason) : m.content,
         }));
         setIsStreaming(false);
-        refreshSessions();
       }
     },
-    [input, isStreaming, activeSessionId, effort, webSearch, refreshSessions],
+    [input, isStreaming, activeSessionId, effort, webSearch, storageReady, sessionTitle, messages, saveChats],
   );
 
   return (
@@ -331,6 +321,7 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
           onRefreshLeague={refreshLeague}
         />
 
+        {storageWarning && <p role="status" className="px-4 py-2 text-sm text-gold">{storageWarning}</p>}
         <div ref={scrollRef} onScroll={handleScroll} className="relative flex-1 overflow-y-auto">
           {messages.length === 0 ? (
             <Welcome
@@ -354,7 +345,7 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
           setInput={setInput}
           textareaRef={textareaRef}
           isStreaming={isStreaming}
-          canSend={input.trim().length > 0}
+          canSend={storageReady && input.trim().length > 0}
           effort={effort}
           webSearch={webSearch}
           activeTeam={activeTeam}
