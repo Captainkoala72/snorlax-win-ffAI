@@ -38,7 +38,7 @@ function EffortControl({
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
-  const current = REASONING_EFFORTS.find((e) => e.id === effort) ?? REASONING_EFFORTS[4];
+  const current = REASONING_EFFORTS.find((e) => e.id === effort) ?? REASONING_EFFORTS[0];
 
   return (
     <div ref={ref} className="relative">
@@ -59,7 +59,7 @@ function EffortControl({
       {open && (
         <div className="animate-pop absolute right-0 top-full z-40 mt-2 w-64 overflow-hidden rounded-xl border border-line bg-raised/95 shadow-2xl backdrop-blur-xl">
           <p className="border-b border-line px-3.5 pb-2 pt-3 text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-faint">
-            Muse Spark reasoning effort
+            GLM-5.3-Flash reasoning effort
           </p>
           {REASONING_EFFORTS.map((e) => (
             <button
@@ -109,7 +109,7 @@ function WebSearchToggle({
           ? "border-wine/60 bg-wine/[0.14] text-ink"
           : "border-line bg-white/[0.03] text-muted hover:text-ink"
       }`}
-      title="Let Muse Spark search the web for the latest news"
+      title="Let GLM-5.3-Flash search the web for the latest news"
     >
       <Globe className={`size-3.5 ${enabled ? "text-wine-bright" : ""}`} />
       <span className="hidden sm:inline">Web search</span>
@@ -145,19 +145,19 @@ export function ChatHeader(props: ChatHeaderProps) {
         <Menu className="size-5" />
       </button>
 
-      <div className="flex min-w-0 items-center gap-2.5">
+      <div className="flex min-w-0 flex-1 items-center gap-2.5">
         <div className="hidden size-8 place-items-center rounded-lg bg-gradient-to-br from-wine to-wine-deep sm:grid">
           <Wine className="size-4 text-ink" strokeWidth={1.8} />
         </div>
         <div className="min-w-0">
           <h1 className="truncate text-[0.95rem] font-semibold text-ink">{title}</h1>
           <p className="truncate text-[0.68rem] text-faint">
-            Wine League · {weekLabel} · muse-spark-1.3
+            Degenerates With Integrity Fantasy Assistant · {weekLabel} · glm-5.3-flash
           </p>
         </div>
       </div>
 
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex shrink-0 items-center gap-2">
         <button
           onClick={props.onRefreshLeague}
           disabled={refreshing}

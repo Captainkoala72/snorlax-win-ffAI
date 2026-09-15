@@ -120,7 +120,7 @@ export function MessageList({ messages }: { messages: UiMessage[] }) {
       )}
       <div className="flex items-center gap-1.5 px-11 text-[0.65rem] text-faint">
         <ChevronRight className="size-3" />
-        Wine League AI can make mistakes — verify critical lineup calls.
+        Degenerates With Integrity Fantasy Assistant AI can make mistakes — verify critical lineup calls.
       </div>
     </div>
   );

@@ -42,7 +42,7 @@ function Brand() {
       </div>
       <div className="min-w-0">
         <p className="font-display text-[1.05rem] font-semibold leading-tight tracking-tight text-ink">
-          Wine League
+          Degenerates With Integrity Fantasy Assistant
         </p>
         <p className="text-[0.68rem] font-medium uppercase tracking-[0.14em] text-faint">
           AI Fantasy Assistant
@@ -265,7 +265,7 @@ function SidebarBody(props: SidebarProps) {
         <div className="mt-2.5 flex items-center gap-1.5 px-1 text-[0.65rem] text-faint">
           <CalendarRange className="size-3" />
           <span>
-            Muse Spark 1.3 · {league.league.scoringType} ·{" "}
+            GLM-5.3-Flash · {league.league.scoringType} ·{" "}
             {league.league.pointsPerReception === 1
               ? "PPR"
               : league.league.pointsPerReception === 0.5

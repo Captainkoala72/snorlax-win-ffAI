@@ -1,3 +1,4 @@
+import { env } from "../env";
 // Public ESPN news + search, used for the AI's web-search grounding.
 
 export interface NewsItem {
@@ -38,49 +39,21 @@ export async function getNflNews(limit = 20): Promise<NewsItem[]> {
   }
 }
 
-/**
- * Best-effort web search: ESPN's search endpoint first, then a keyword
- * filter over the latest NFL news, then the raw news front page.
- */
+/** Search the wider web through Z.AI, preserving source links. */
 export async function searchWeb(query: string): Promise<SearchResult[]> {
-  const q = query.trim();
-  if (!q) return [];
-
-  try {
-    const url =
-      "https://site.api.espn.com/apis/common/v3/search?query=" +
-      encodeURIComponent(q) +
-      "&limit=8";
-    const res = await fetch(url, { next: { revalidate: 1800 } });
-    if (res.ok) {
-      const json = (await res.json()) as Record<string, any>;
-      const raw: any[] = [
-        ...((json.articles as any[]) ?? []),
-        ...((json.results as any[]) ?? []),
-        ...((json.athletes as any[]) ?? []),
-      ];
-      const items = raw
-        .map((r) => ({
-          title: String(r?.headline ?? r?.title ?? r?.displayName ?? "").trim(),
-          snippet: String(r?.description ?? r?.summary ?? "").trim(),
-          url: String(r?.links?.web?.href ?? r?.webUrl ?? r?.href ?? ""),
-        }))
-        .filter((r) => r.title.length > 0)
-        .slice(0, 8);
-      if (items.length > 0) return items;
-    }
-  } catch {
-    // fall through to news
-  }
-
-  const news = await getNflNews(40);
-  const needle = q.toLowerCase();
-  const filtered = news
-    .filter((n) => `${n.headline} ${n.description}`.toLowerCase().includes(needle))
-    .map((n) => ({ title: n.headline, snippet: n.description, url: n.url }));
-  if (filtered.length > 0) return filtered.slice(0, 8);
-
-  return news
-    .slice(0, 6)
-    .map((n) => ({ title: n.headline, snippet: n.description, url: n.url }));
+  if (!query.trim()) return [];
+  if (!env.zaiApiKey) throw new Error("ZAI_API_KEY is required for web search.");
+  const res = await fetch(env.baseUrl + "/web_search", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + env.zaiApiKey },
+    body: JSON.stringify({ search_engine: "search-prime", search_query: query.trim(), count: 8 }),
+    cache: "no-store",
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!res.ok) throw new Error("Z.AI web search failed (HTTP " + res.status + ").");
+  const data = await res.json();
+  if (!Array.isArray(data.search_result)) throw new Error("Z.AI returned an invalid search response.");
+  return data.search_result.map((r: { title?: string; content?: string; link?: string }) => ({
+    title: r.title ?? "", snippet: r.content ?? "", url: r.link ?? "",
+  }));
 }

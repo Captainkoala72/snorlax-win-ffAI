@@ -16,9 +16,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Wine League — AI Fantasy Assistant",
+  title: "Degenerates With Integrity Fantasy Assistant",
   description:
-    "Muse Spark 1.3-powered fantasy football assistant for the Wine League ESPN league.",
+    "GLM-5.3-Flash-powered fantasy football assistant for the Degenerates With Integrity Fantasy Assistant ESPN league.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

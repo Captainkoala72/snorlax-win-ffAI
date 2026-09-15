@@ -51,10 +51,10 @@ export function Welcome({
       <div className="animate-fade-up text-center">
         <p className="mx-auto mb-4 inline-flex items-center gap-2 rounded-full border border-wine/40 bg-wine/[0.1] px-3.5 py-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-wine-bright">
           <Sparkles className="size-3.5" />
-          Muse Spark 1.3 · {meta.season} Season
+          GLM-5.3-Flash · {meta.season} Season
         </p>
-        <h1 className="font-display text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
-          <span className="text-gradient-wine">Wine League</span>
+        <h1 className="font-display text-3xl font-semibold leading-[1.12] tracking-tight sm:text-5xl">
+          <span className="text-gradient-wine">Degenerates With Integrity Fantasy Assistant</span>
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-[0.95rem] leading-relaxed text-muted">
           Your AI fantasy football analyst, wired straight into the league.
@@ -63,12 +63,19 @@ export function Welcome({
         </p>
       </div>
 
+      {meta.status !== "ok" && (
+        <div role="status" className="rounded-xl border border-gold/30 bg-gold/10 p-4 text-sm text-muted">
+          <strong className="text-ink">{meta.status === "demo" ? "Sample league data" : "ESPN league unavailable"}</strong>
+          <p className="mt-1">{meta.errorMessage ?? "Connect your ESPN league to load live teams and matchups."}</p>
+        </div>
+      )}
+
       {/* Current week strip */}
       {currentMatchups.length > 0 && (
         <div className="animate-fade-up" style={{ animationDelay: "0.08s" }}>
           <div className="mb-2.5 flex items-center justify-between px-1">
             <p className="text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-faint">
-              Week {meta.currentWeek} {currentMatchups[0]?.isPlayoff ? "· Playoffs" : "· Live"}
+              Week {meta.currentWeek} {meta.status === "demo" ? "· Sample" : currentMatchups[0]?.isPlayoff ? "· Playoffs" : "· Live"}
             </p>
             <p className="text-[0.7rem] text-faint">{meta.scoringType}</p>
           </div>
