@@ -1,6 +1,8 @@
 import type { SessionSummary, UiMessage } from "./chat-ui";
+import { DEFAULT_MODEL, isChatModel, type ChatModel } from "./ai/models";
 
 export interface LocalChat extends SessionSummary {
+  model?: ChatModel;
   messages: UiMessage[];
 }
 
@@ -20,7 +22,7 @@ export function readChats(storage: Pick<Storage, "getItem">, key: string): Local
       ["user", "assistant"].includes(m.role) && typeof m.content === "string" &&
       (m.toolCalls === undefined || (Array.isArray(m.toolCalls) && m.toolCalls.every((t) =>
         t && typeof t.id === "string" && typeof t.name === "string" && ["running", "ok", "error"].includes(t.status)))));
-  }).map((chat) => ({ ...chat, messages: chat.messages.map((m) => ({
+  }).map((chat) => ({ ...chat, model: isChatModel(chat.model) ? chat.model : DEFAULT_MODEL, messages: chat.messages.map((m) => ({
     ...m, streaming: false,
     error: m.error || Boolean(m.streaming),
   })) })).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));

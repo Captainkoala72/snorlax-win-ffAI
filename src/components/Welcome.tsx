@@ -51,7 +51,7 @@ export function Welcome({
       <div className="animate-fade-up text-center">
         <p className="mx-auto mb-4 inline-flex items-center gap-2 rounded-full border border-wine/40 bg-wine/[0.1] px-3.5 py-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-wine-bright">
           <Sparkles className="size-3.5" />
-          GLM-5.3-Flash · {meta.season} Season
+          GLM Flash / Claude Haiku · {meta.season} Season
         </p>
         <h1 className="font-display text-3xl font-semibold leading-[1.12] tracking-tight sm:text-5xl">
           <span className="text-gradient-wine">Degenerates With Integrity Fantasy Assistant</span>

@@ -2,12 +2,14 @@ import { MissingApiKeyError, runChat } from "@/lib/ai/client";
 import { buildSystemPrompt, type ChatMessage } from "@/lib/ai/prompt";
 import { executeTool, TOOL_DEFS } from "@/lib/ai/tools";
 import { sanitizeHistory } from "@/lib/chat-history";
-import { env, REASONING_EFFORTS, type ReasoningEffort } from "@/lib/env";
+import { REASONING_EFFORTS, type ReasoningEffort } from "@/lib/env";
+import { DEFAULT_MODEL, isChatModel } from "@/lib/ai/models";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 interface ChatRequestBody {
+  model?: unknown;
   history?: unknown;
   message?: string;
   reasoningEffort?: string;
@@ -24,11 +26,11 @@ function asEffort(v: unknown): ReasoningEffort {
 
 function friendlyError(err: unknown): string {
   if (err instanceof MissingApiKeyError) {
-    return "GLM-5.3-Flash is not connected yet. Add ZAI_API_KEY to your environment secrets to start chatting.";
+    return `The selected model is not connected yet. Add ${err.keyName} to your environment secrets to start chatting.`;
   }
   if (err instanceof Error) {
     if (err.message.includes("fetch failed") || err.message.includes("ECONNREFUSED")) {
-      return "Could not reach the GLM-5.3-Flash API. Check your connection to api.z.ai.";
+      return "Could not reach the selected model's API. Please try again.";
     }
     return err.message;
   }
@@ -40,6 +42,8 @@ export async function POST(req: Request) {
   const userMessage = typeof body.message === "string" ? body.message.trim() : "";
   const effort = asEffort(body.reasoningEffort);
   const webSearch = body.webSearch !== false;
+  const model = body.model === undefined ? DEFAULT_MODEL : body.model;
+  if (!isChatModel(model)) return Response.json({ error: "Unsupported chat model." }, { status: 400 });
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -52,7 +56,7 @@ export async function POST(req: Request) {
 
       try {
         if (!userMessage) throw new Error("Message cannot be empty.");
-        send("start", { model: env.model, effort });
+        send("start", { model, effort });
         const history = sanitizeHistory(body.history);
         const userMsg: ChatMessage = { role: "user", content: userMessage };
         const systemPrompt = await buildSystemPrompt();
@@ -64,6 +68,7 @@ export async function POST(req: Request) {
 
         // ---- Stream the model, running the tool loop server-side ----
         const answer = await runChat({
+          model,
           messages,
           effort,
           webSearch,
@@ -79,7 +84,7 @@ export async function POST(req: Request) {
         });
 
         if (!answer || !answer.trim()) {
-          throw new Error("GLM-5.3-Flash returned an empty response. Please try again.");
+          throw new Error("The selected model returned an empty response. Please try again.");
         }
 
         send("done", { ok: true });

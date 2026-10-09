@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReasoningEffort } from "@/lib/env";
+import { DEFAULT_MODEL, type ChatModel } from "@/lib/ai/models";
 import type { ClientLeague, TeamSummary } from "@/lib/serialize";
 import { LEAGUE_PROMPTS, TEAM_PROMPTS } from "@/lib/prompts";
 import { parseSse, type UiMessage, type UiToolCall } from "@/lib/chat-ui";
@@ -22,6 +23,7 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [effort, setEffort] = useState<ReasoningEffort>("max");
   const [webSearch, setWebSearch] = useState(true);
+  const [model, setModel] = useState<ChatModel>(DEFAULT_MODEL);
   const [input, setInput] = useState("");
   const [activeTeamId, setActiveTeamId] = useState<number | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -68,8 +70,8 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
     if (!storageReady || isStreaming || activeSessionId === null || messages.length === 0) return;
     const previous = chatsRef.current.find((s) => s.id === activeSessionId);
     if (!previous) return;
-    saveChats([{ ...previous, messages, updatedAt: new Date().toISOString() }, ...chatsRef.current.filter((s) => s.id !== activeSessionId)]);
-  }, [messages, isStreaming, activeSessionId, storageReady, saveChats]);
+    saveChats([{ ...previous, model, messages, updatedAt: new Date().toISOString() }, ...chatsRef.current.filter((s) => s.id !== activeSessionId)]);
+  }, [messages, model, isStreaming, activeSessionId, storageReady, saveChats]);
 
   // Auto-scroll while streaming (only if the user is near the bottom).
   useEffect(() => {
@@ -146,6 +148,7 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
     const chat = chatsRef.current.find((s) => s.id === id);
     if (!chat) return;
     setMessages(chat.messages);
+    setModel(chat.model ?? DEFAULT_MODEL);
     setActiveSessionId(id);
     setSessionTitle(chat.title);
     setSidebarOpen(false);
@@ -184,7 +187,7 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
       const title = sessionTitle || text.replace(/\s+/g, " ").slice(0, 48);
       setActiveSessionId(id);
       setSessionTitle(title);
-      saveChats([{ id, title, createdAt: chatsRef.current.find((s) => s.id === id)?.createdAt ?? now, updatedAt: now,
+      saveChats([{ id, title, model, createdAt: chatsRef.current.find((s) => s.id === id)?.createdAt ?? now, updatedAt: now,
         messages: [...messages, { key: crypto.randomUUID(), role: "user", content: text }],
       }, ...chatsRef.current.filter((s) => s.id !== id)]);
 
@@ -208,6 +211,7 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
           body: JSON.stringify({
             history: messages.filter((m) => !m.error && !m.streaming && (m.role === "user" || m.role === "assistant")).map(({ role, content }) => ({ role, content })),
             message: text,
+            model,
             reasoningEffort: effort,
             webSearch,
           }),
@@ -286,7 +290,7 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
         setIsStreaming(false);
       }
     },
-    [input, isStreaming, activeSessionId, effort, webSearch, storageReady, sessionTitle, messages, saveChats],
+    [input, isStreaming, activeSessionId, model, effort, webSearch, storageReady, sessionTitle, messages, saveChats],
   );
 
   return (
@@ -309,6 +313,8 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
 
       <main className="relative flex min-w-0 flex-1 flex-col">
         <ChatHeader
+          model={model}
+          onModelChange={setModel}
           league={league}
           title={messages.length > 0 ? sessionTitle || "AI Fantasy Assistant" : "AI Fantasy Assistant"}
           effort={effort}
@@ -341,6 +347,7 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
         </div>
 
         <Composer
+          model={model}
           input={input}
           setInput={setInput}
           textareaRef={textareaRef}

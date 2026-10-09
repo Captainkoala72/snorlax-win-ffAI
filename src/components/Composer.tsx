@@ -10,9 +10,11 @@ import {
 import { ArrowUp, Beer, Globe, Loader2, SendHorizonal, Sparkles, X } from "lucide-react";
 import type { TeamSummary } from "@/lib/serialize";
 import type { ReasoningEffort } from "@/lib/env";
+import { CHAT_MODELS, type ChatModel } from "@/lib/ai/models";
 import { TEAM_PROMPTS } from "@/lib/prompts";
 
 interface ComposerProps {
+  model: ChatModel;
   input: string;
   setInput: (v: string) => void;
   textareaRef: RefObject<HTMLTextAreaElement | null>;
@@ -212,7 +214,7 @@ export function Composer(props: ComposerProps) {
         </div>
 
         <p className="mt-2.5 text-center text-[0.65rem] text-faint">
-          Degenerates With Integrity Fantasy Assistant · glm-5.3-flash · {props.leagueStatus === "demo" ? "Sample data" : props.leagueStatus === "ok" ? "Live ESPN data" : "ESPN offline"} ·{" "}
+          {CHAT_MODELS.find((model) => model.id === props.model)?.label} · {props.leagueStatus === "demo" ? "Sample data" : props.leagueStatus === "ok" ? "Live ESPN data" : "ESPN offline"} ·{" "}
           <span className="text-muted">{teams.length} teams</span>
         </p>
       </div>

@@ -25,6 +25,7 @@ const TOOL_ICONS: Record<string, typeof Database> = {
   get_standings: Trophy,
   get_player_news: Newspaper,
   search_web: Globe,
+  web_search: Globe,
 };
 
 function ToolChip({ tool }: { tool: UiToolCall }) {

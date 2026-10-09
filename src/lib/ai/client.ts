@@ -4,6 +4,8 @@
 import { env, type ReasoningEffort } from "../env";
 import type { ToolDef } from "./tools";
 import type { ChatMessage } from "./prompt";
+import type { ChatModel } from "./models";
+import { runAnthropicChat } from "./anthropic";
 
 export interface ChatCallbacks {
   onStart?: (info: { model: string; effort: ReasoningEffort }) => void;
@@ -13,6 +15,7 @@ export interface ChatCallbacks {
 }
 
 export interface RunChatOptions {
+  model?: ChatModel;
   messages: ChatMessage[];
   effort: ReasoningEffort;
   webSearch: boolean;
@@ -30,8 +33,8 @@ interface ToolCallAccumulator {
 const MAX_TOOL_ITERATIONS = 6;
 
 export class MissingApiKeyError extends Error {
-  constructor() {
-    super("ZAI_API_KEY is not configured.");
+  constructor(public readonly keyName = "ZAI_API_KEY") {
+    super(`${keyName} is not configured.`);
     this.name = "MissingApiKeyError";
   }
 }
@@ -51,6 +54,10 @@ async function readError(res: Response): Promise<string> {
 }
 
 export async function runChat(opts: RunChatOptions): Promise<string> {
+  if (opts.model === "claude-haiku-5-5") {
+    if (!env.anthropicApiKey) throw new MissingApiKeyError("ANTHROPIC_API_KEY");
+    return runAnthropicChat(opts);
+  }
   if (!env.zaiApiKey) throw new MissingApiKeyError();
 
   const url = `${env.baseUrl}/chat/completions`;
