@@ -265,7 +265,7 @@ function SidebarBody(props: SidebarProps) {
         <div className="mt-2.5 flex items-center gap-1.5 px-1 text-[0.65rem] text-faint">
           <CalendarRange className="size-3" />
           <span>
-            GLM-5.3-Flash · {league.league.scoringType} ·{" "}
+            Fantasy Assistant · {league.league.scoringType} ·{" "}
             {league.league.pointsPerReception === 1
               ? "PPR"
               : league.league.pointsPerReception === 0.5

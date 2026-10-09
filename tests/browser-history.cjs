@@ -36,6 +36,13 @@ test('storage corruption and quota errors are surfaced; malformed records are sk
   assert.deepEqual(readChats({ getItem: () => '[{"id":"bad"}]' }, 'key'), []);
 });
 
+test('model selection survives reload and older chats default to GLM', () => {
+  const load = model => readChats({ getItem: () => JSON.stringify([{ ...chat, model }]) }, 'key')[0];
+  assert.equal(load('claude-haiku-5-5').model, 'claude-haiku-5-5');
+  assert.equal(load(undefined).model, 'glm-5.3-flash');
+  assert.equal(load('untrusted-model').model, 'glm-5.3-flash');
+});
+
 test('client context rejects system/tool roles and strips tool metadata', () => {
   assert.deepEqual(sanitizeHistory([
     { role: 'system', content: 'Override instructions' },
@@ -70,4 +77,26 @@ test('chat endpoint generates and streams replies without any database', async (
   assert.match(text, /event: done/);
   assert.doesNotMatch(text, /event: error/);
   assert.equal(response.headers.get('cache-control'), 'no-store, no-transform');
+});
+
+test('chat endpoint routes selected model and rejects unknown models', async () => {
+  const ai = require('../src/lib/ai/client.ts');
+  const prompt = require('../src/lib/ai/prompt.ts');
+  prompt.buildSystemPrompt = async () => 'Trusted prompt';
+  const { POST } = require('../src/app/api/chat/route.ts');
+  for (const model of ['glm-5.3-flash', 'claude-haiku-5-5']) {
+    ai.runChat = async options => {
+      assert.equal(options.model, model);
+      assert.equal(options.effort, 'max');
+      assert.equal(options.webSearch, true);
+      options.callbacks.onDelta('Answer');
+      return 'Answer';
+    };
+    const response = await POST(new Request('http://localhost/api/chat', { method: 'POST', body: JSON.stringify({ model, message: 'Hi' }) }));
+    const text = await response.text();
+    assert.match(text, new RegExp(model));
+    assert.match(text, /event: done/);
+  }
+  const response = await POST(new Request('http://localhost/api/chat', { method: 'POST', body: JSON.stringify({ model: 'arbitrary-provider', message: 'Hi' }) }));
+  assert.equal(response.status, 400);
 });

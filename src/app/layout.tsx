@@ -18,7 +18,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Degenerates With Integrity Fantasy Assistant",
   description:
-    "GLM-5.3-Flash-powered fantasy football assistant for the Degenerates With Integrity Fantasy Assistant ESPN league.",
+    "Fantasy football assistant with GLM Flash and Claude Haiku for the Degenerates With Integrity ESPN league.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

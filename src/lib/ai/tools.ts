@@ -1,4 +1,4 @@
-// OpenAI-compatible function tools exposed to GLM-5.3-Flash.
+// Shared function definitions; each provider converts to its native tool format.
 // Every tool is backed by live ESPN league data or public ESPN news/search.
 
 import { findTeam, getLeagueData } from "../espn/client";
@@ -284,6 +284,7 @@ export function toolSummary(name: string, args: any): string {
       return "League standings";
     case "get_player_news":
       return args?.query ? `NFL news · ${args.query}` : "Latest NFL news";
+    case "web_search":
     case "search_web":
       return `Web search · ${args?.query ?? ""}`;
     default:

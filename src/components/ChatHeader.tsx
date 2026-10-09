@@ -4,8 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { Beer, Check, ChevronDown, Globe, Menu, RefreshCw, Sparkles } from "lucide-react";
 import type { ClientLeague } from "@/lib/serialize";
 import { REASONING_EFFORTS, type ReasoningEffort } from "@/lib/env";
+import { CHAT_MODELS, isChatModel, type ChatModel } from "@/lib/ai/models";
 
 interface ChatHeaderProps {
+  model: ChatModel;
+  onModelChange: (model: ChatModel) => void;
   league: ClientLeague;
   title: string;
   effort: ReasoningEffort;
@@ -59,7 +62,7 @@ function EffortControl({
       {open && (
         <div className="animate-pop absolute right-0 top-full z-40 mt-2 w-64 overflow-hidden rounded-xl border border-line bg-raised/95 shadow-2xl backdrop-blur-xl">
           <p className="border-b border-line px-3.5 pb-2 pt-3 text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-faint">
-            GLM-5.3-Flash reasoning effort
+            Reasoning effort
           </p>
           {REASONING_EFFORTS.map((e) => (
             <button
@@ -109,7 +112,9 @@ function WebSearchToggle({
           ? "border-wine/60 bg-wine/[0.14] text-ink"
           : "border-line bg-white/[0.03] text-muted hover:text-ink"
       }`}
-      title="Let GLM-5.3-Flash search the web for the latest news"
+      title="Search the web for the latest news"
+      aria-label="Web search"
+      aria-pressed={enabled}
     >
       <Globe className={`size-3.5 ${enabled ? "text-wine-bright" : ""}`} />
       <span className="hidden sm:inline">Web search</span>
@@ -136,7 +141,7 @@ export function ChatHeader(props: ChatHeaderProps) {
       : "2026";
 
   return (
-    <header className="relative z-30 flex items-center gap-3 border-b border-line bg-base/70 px-4 py-3 backdrop-blur-md sm:px-6">
+    <header className="relative z-30 flex flex-wrap items-center gap-3 border-b border-line bg-base/70 px-4 py-3 backdrop-blur-md sm:px-6">
       <button
         aria-label="Open menu"
         className="grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-white/[0.05] hover:text-ink lg:hidden"
@@ -152,12 +157,21 @@ export function ChatHeader(props: ChatHeaderProps) {
         <div className="min-w-0">
           <h1 className="truncate text-[0.95rem] font-semibold text-ink">{title}</h1>
           <p className="truncate text-[0.68rem] text-faint">
-            Degenerates With Integrity Fantasy Assistant · {weekLabel} · glm-5.3-flash
+            Degenerates With Integrity Fantasy Assistant · {weekLabel}
           </p>
         </div>
       </div>
 
-      <div className="ml-auto flex shrink-0 items-center gap-2">
+      <div className="ml-auto flex w-full shrink-0 items-center justify-end gap-2 sm:w-auto">
+        <select
+          aria-label="AI model"
+          value={props.model}
+          disabled={isStreaming}
+          onChange={(event) => { if (isChatModel(event.target.value)) props.onModelChange(event.target.value); }}
+          className="focus-ring min-w-0 rounded-lg border border-line bg-panel px-2 py-1.5 text-[0.75rem] font-medium text-ink disabled:opacity-50"
+        >
+          {CHAT_MODELS.map((model) => <option key={model.id} value={model.id}>{model.label}</option>)}
+        </select>
         <button
           onClick={props.onRefreshLeague}
           disabled={refreshing}
