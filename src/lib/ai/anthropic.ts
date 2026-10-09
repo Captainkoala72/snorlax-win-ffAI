@@ -78,7 +78,9 @@ export async function runAnthropicChat(opts: RunChatOptions): Promise<string> {
         }
       } else if (event.type === "content_block_stop") {
         const block = blocks[event.index];
-        if (partialInputs.has(event.index)) block.input = JSON.parse(partialInputs.get(event.index)!);
+        const partialInput = partialInputs.get(event.index);
+        // Empty-object tools can stream an empty fragment; retain the initial {}.
+        if (partialInput?.trim()) block.input = JSON.parse(partialInput);
         if (block.type === "server_tool_use" && block.name === "web_search") {
           searchCalls.add(block.id);
           callbacks.onToolCall?.(block.id, "web_search", block.input);

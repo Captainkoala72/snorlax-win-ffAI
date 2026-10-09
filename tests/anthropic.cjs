@@ -111,6 +111,18 @@ test('tool failures return Anthropic error results and allow a useful reply', as
   assert.equal(await runChat({ ...options, executeTool: async () => { throw new Error('ESPN unavailable'); } }), 'ESPN is unavailable.');
 });
 
+test('no-argument tools can stream an empty JSON fragment', async () => {
+  let count = 0;
+  global.fetch = async () => ++count === 1 ? stream([
+    start(0, { type: 'tool_use', id: 'empty1', name: 'get_league_overview', input: {} }),
+    delta(0, { type: 'input_json_delta', partial_json: '' }), stop(0), finish('tool_use'),
+  ]) : textReply('League loaded.');
+  assert.equal(await runChat({ ...options,
+    tools: [{ type: 'function', function: { name: 'get_league_overview', description: 'League', parameters: { type: 'object', properties: {} } } }],
+    executeTool: async (name, args) => { assert.equal(name, 'get_league_overview'); assert.deepEqual(args, {}); return '{}'; },
+  }), 'League loaded.');
+});
+
 test('Haiku surfaces upstream errors, truncation, incomplete streams, and empty answers', async () => {
   for (const [response, expected] of [
     [new Response('secret upstream details', { status: 401 }), /rejected the API key/],
