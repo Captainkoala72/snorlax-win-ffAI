@@ -4,6 +4,7 @@ import { executeTool, TOOL_DEFS } from "@/lib/ai/tools";
 import { sanitizeHistory } from "@/lib/chat-history";
 import { REASONING_EFFORTS, type ReasoningEffort } from "@/lib/env";
 import { DEFAULT_MODEL, isChatModel } from "@/lib/ai/models";
+import { imageBytes, MAX_IMAGE_BYTES, parseImages } from "@/lib/images";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -12,6 +13,7 @@ interface ChatRequestBody {
   model?: unknown;
   history?: unknown;
   message?: string;
+  images?: unknown;
   reasoningEffort?: string;
   webSearch?: boolean;
 }
@@ -44,6 +46,10 @@ export async function POST(req: Request) {
   const webSearch = body.webSearch !== false;
   const model = body.model === undefined ? DEFAULT_MODEL : body.model;
   if (!isChatModel(model)) return Response.json({ error: "Unsupported chat model." }, { status: 400 });
+  let images;
+  try { images = parseImages(body.images); }
+  catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Invalid images." }, { status: 400 }); }
+  if (images.length && model !== "mimo-v2.6-pro") return Response.json({ error: "Select MiMo V2.6 Pro to analyze attached images." }, { status: 400 });
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -55,10 +61,11 @@ export async function POST(req: Request) {
       };
 
       try {
-        if (!userMessage) throw new Error("Message cannot be empty.");
-        send("start", { model, effort });
-        const history = sanitizeHistory(body.history);
-        const userMsg: ChatMessage = { role: "user", content: userMessage };
+        if (!userMessage && !images.length) throw new Error("Message cannot be empty.");
+        send("start", { model, effort: model === "mimo-v2.6-pro" ? "enabled" : effort });
+        const imageBudget = model === "mimo-v2.6-pro" ? MAX_IMAGE_BYTES - images.reduce((sum, image) => sum + imageBytes(image), 0) : 0;
+        const history = sanitizeHistory(body.history, imageBudget);
+        const userMsg: ChatMessage = { role: "user", content: userMessage || "Analyze the attached image.", ...(images.length ? { images } : {}) };
         const systemPrompt = await buildSystemPrompt();
         const messages: ChatMessage[] = [
           { role: "system", content: systemPrompt },

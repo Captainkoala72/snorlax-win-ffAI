@@ -72,7 +72,7 @@ test('GLM streams fragmented tools and preserves reasoning for the next turn', a
       { tool_calls: [{ index: 0, function: { arguments: '"49ers"}' } }] },
     ]) : sse([{ content: 'Here is your roster.' }]);
   };
-  const answer = await runChat({ messages: [{ role: 'user', content: 'My roster?' }], effort: 'max', webSearch: true,
+  const answer = await runChat({ model: 'glm-5.3-flash', messages: [{ role: 'user', content: 'My roster?' }], effort: 'max', webSearch: true,
     tools: [{ type: 'function', function: { name: 'get_team', parameters: {} } }],
     executeTool: async (name, args) => { executed.push([name, args]); return '{"roster":[]}'; },
   });
@@ -92,7 +92,7 @@ test('disabled search is removed from model tools', async () => {
     assert.deepEqual(JSON.parse(options.body).tools, []);
     return sse([{ content: 'Hello' }]);
   };
-  await runChat({ messages: [], effort: 'max', webSearch: false,
+  await runChat({ model: 'glm-5.3-flash', messages: [], effort: 'max', webSearch: false,
     tools: [{ type: 'function', function: { name: 'search_web', parameters: {} } }],
     executeTool: async () => assert.fail('must not execute search'),
   });

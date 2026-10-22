@@ -181,7 +181,8 @@ export function ChatHeader(props: ChatHeaderProps) {
           <RefreshCw className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} />
         </button>
         <WebSearchToggle enabled={webSearch} disabled={isStreaming} onChange={props.onWebSearchChange} />
-        <EffortControl effort={effort} disabled={isStreaming} onChange={props.onEffortChange} />
+        {props.model === "mimo-v2.6-pro" ? <span title="MiMo deep thinking is enabled" className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-[0.75rem] text-ink"><Sparkles className="size-3.5 text-wine-bright" /><span className="hidden sm:inline">Thinking</span> On</span>
+          : <EffortControl effort={effort} disabled={isStreaming} onChange={props.onEffortChange} />}
       </div>
     </header>
   );

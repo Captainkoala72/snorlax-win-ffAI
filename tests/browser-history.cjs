@@ -39,6 +39,7 @@ test('storage corruption and quota errors are surfaced; malformed records are sk
 test('model selection survives reload and older chats default to GLM', () => {
   const load = model => readChats({ getItem: () => JSON.stringify([{ ...chat, model }]) }, 'key')[0];
   assert.equal(load('claude-haiku-5-5').model, 'claude-haiku-5-5');
+  assert.equal(load('mimo-v2.6-pro').model, 'mimo-v2.6-pro');
   assert.equal(load(undefined).model, 'glm-5.3-flash');
   assert.equal(load('untrusted-model').model, 'glm-5.3-flash');
 });
@@ -84,7 +85,7 @@ test('chat endpoint routes selected model and rejects unknown models', async () 
   const prompt = require('../src/lib/ai/prompt.ts');
   prompt.buildSystemPrompt = async () => 'Trusted prompt';
   const { POST } = require('../src/app/api/chat/route.ts');
-  for (const model of ['glm-5.3-flash', 'claude-haiku-5-5']) {
+  for (const model of ['mimo-v2.6-pro', 'glm-5.3-flash', 'claude-haiku-5-5']) {
     ai.runChat = async options => {
       assert.equal(options.model, model);
       assert.equal(options.effort, 'max');
@@ -99,4 +100,25 @@ test('chat endpoint routes selected model and rejects unknown models', async () 
   }
   const response = await POST(new Request('http://localhost/api/chat', { method: 'POST', body: JSON.stringify({ model: 'arbitrary-provider', message: 'Hi' }) }));
   assert.equal(response.status, 400);
+});
+
+test('chat defaults to MiMo and allows image-only messages; other models reject attachments', async () => {
+  const ai = require('../src/lib/ai/client.ts');
+  const { POST } = require('../src/app/api/chat/route.ts');
+  const image = { name: 'test.png', dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jBb0AAAAASUVORK5CYII=' };
+  ai.runChat = async options => {
+    assert.equal(options.model, 'mimo-v2.6-pro');
+    assert.deepEqual(options.messages.at(-1).images, [image]);
+    assert.equal(options.messages.at(-1).content, 'Analyze the attached image.');
+    options.callbacks.onDelta('Image analysis');
+    return 'Image analysis';
+  };
+  const request = body => new Request('http://localhost/api/chat', { method: 'POST', body: JSON.stringify(body) });
+  const response = await POST(request({ images: [image] }));
+  const text = await response.text();
+  assert.match(text, /mimo-v2.6-pro/);
+  assert.match(text, /"effort":"enabled"/);
+  assert.match(text, /event: done/);
+  assert.equal((await POST(request({ model: 'glm-5.3-flash', message: 'Analyze', images: [image] }))).status, 400);
+  assert.equal((await POST(request({ message: 'Analyze', images: [{ dataUrl: 'invalid' }] }))).status, 400);
 });
