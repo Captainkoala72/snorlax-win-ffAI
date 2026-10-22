@@ -13,6 +13,8 @@ import { MessageList } from "./MessageList";
 import { Welcome } from "./Welcome";
 import { Composer } from "./Composer";
 import { TeamDrawer } from "./TeamDrawer";
+import { imageBytes, MAX_IMAGE_BYTES, type ImageAttachment } from "@/lib/images";
+import { sanitizeHistory } from "@/lib/chat-history";
 
 export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
   const [league, setLeague] = useState<ClientLeague>(initial);
@@ -25,6 +27,7 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
   const [webSearch, setWebSearch] = useState(true);
   const [model, setModel] = useState<ChatModel>(DEFAULT_MODEL);
   const [input, setInput] = useState("");
+  const [images, setImages] = useState<ImageAttachment[]>([]);
   const [activeTeamId, setActiveTeamId] = useState<number | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [drawerTeamId, setDrawerTeamId] = useState<number | null>(null);
@@ -140,6 +143,8 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
     setActiveSessionId(null);
     setSessionTitle("");
     setMessages([]);
+    setImages([]);
+    setModel(DEFAULT_MODEL);
     setSidebarOpen(false);
   }, [isStreaming]);
 
@@ -148,6 +153,7 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
     const chat = chatsRef.current.find((s) => s.id === id);
     if (!chat) return;
     setMessages(chat.messages);
+    setImages([]);
     setModel(chat.model ?? DEFAULT_MODEL);
     setActiveSessionId(id);
     setSessionTitle(chat.title);
@@ -176,25 +182,27 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
   const send = useCallback(
     async (raw?: string) => {
       const text = (raw ?? input).trim();
-      if (!text || isStreaming || !storageReady) return;
+      if ((!text && !images.length) || isStreaming || !storageReady || (images.length && model !== "mimo-v2.6-pro")) return;
+      const content = text || "Analyze the attached image.";
       setIsStreaming(true);
       setInput("");
+      setImages([]);
       setSidebarOpen(false);
       nearBottomRef.current = true;
 
       const now = new Date().toISOString();
       const id = activeSessionId ?? Math.max(Date.now(), ...chatsRef.current.map((s) => s.id + 1));
-      const title = sessionTitle || text.replace(/\s+/g, " ").slice(0, 48);
+      const title = sessionTitle || content.replace(/\s+/g, " ").slice(0, 48);
       setActiveSessionId(id);
       setSessionTitle(title);
       saveChats([{ id, title, model, createdAt: chatsRef.current.find((s) => s.id === id)?.createdAt ?? now, updatedAt: now,
-        messages: [...messages, { key: crypto.randomUUID(), role: "user", content: text }],
+        messages: [...messages, { key: crypto.randomUUID(), role: "user", content, ...(images.length ? { images } : {}) }],
       }, ...chatsRef.current.filter((s) => s.id !== id)]);
 
       const assistantKey = `a-${Date.now()}`;
       setMessages((prev) => [
         ...prev,
-        { key: `u-${Date.now()}`, role: "user", content: text },
+        { key: `u-${Date.now()}`, role: "user", content, ...(images.length ? { images } : {}) },
         { key: assistantKey, role: "assistant", content: "", streaming: true, toolCalls: [] },
       ]);
 
@@ -209,15 +217,17 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            history: messages.filter((m) => !m.error && !m.streaming && (m.role === "user" || m.role === "assistant")).map(({ role, content }) => ({ role, content })),
-            message: text,
+            history: sanitizeHistory(messages.filter((m) => !m.error && !m.streaming), model === "mimo-v2.6-pro" ? MAX_IMAGE_BYTES - images.reduce((sum, image) => sum + imageBytes(image), 0) : 0),
+            message: content,
+            ...(images.length ? { images } : {}),
             model,
             reasoningEffort: effort,
             webSearch,
           }),
         });
         if (!res.ok || !res.body) {
-          failureReason = `The assistant could not be reached (HTTP ${res.status}).`;
+          const error = await res.json().catch(() => null);
+          failureReason = error?.error || `The assistant could not be reached (HTTP ${res.status}).`;
           failed = true;
         } else {
           const reader = res.body.getReader();
@@ -290,7 +300,7 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
         setIsStreaming(false);
       }
     },
-    [input, isStreaming, activeSessionId, model, effort, webSearch, storageReady, sessionTitle, messages, saveChats],
+    [input, images, isStreaming, activeSessionId, model, effort, webSearch, storageReady, sessionTitle, messages, saveChats],
   );
 
   return (
@@ -347,12 +357,14 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
         </div>
 
         <Composer
+          images={images}
+          onImagesChange={setImages}
           model={model}
           input={input}
           setInput={setInput}
           textareaRef={textareaRef}
           isStreaming={isStreaming}
-          canSend={storageReady && input.trim().length > 0}
+          canSend={storageReady && (input.trim().length > 0 || images.length > 0) && (!images.length || model === "mimo-v2.6-pro")}
           effort={effort}
           webSearch={webSearch}
           activeTeam={activeTeam}

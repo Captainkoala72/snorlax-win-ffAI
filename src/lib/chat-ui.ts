@@ -1,4 +1,5 @@
 // Shared UI + SSE helpers for the chat experience.
+import type { ImageAttachment } from "./images";
 
 export interface UiToolCall {
   id: string;
@@ -12,6 +13,7 @@ export interface UiMessage {
   key: string;
   role: "user" | "assistant" | "tool";
   content: string;
+  images?: ImageAttachment[];
   toolCalls?: UiToolCall[];
   toolName?: string;
   streaming?: boolean;

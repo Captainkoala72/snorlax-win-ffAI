@@ -2,18 +2,23 @@
 
 import {
   useEffect,
+  useRef,
   useState,
   type ChangeEvent,
   type KeyboardEvent,
   type RefObject,
 } from "react";
-import { ArrowUp, Beer, Globe, Loader2, SendHorizonal, Sparkles, X } from "lucide-react";
+import { ArrowUp, Beer, Globe, ImagePlus, Loader2, SendHorizonal, Sparkles, X } from "lucide-react";
 import type { TeamSummary } from "@/lib/serialize";
 import type { ReasoningEffort } from "@/lib/env";
 import { CHAT_MODELS, type ChatModel } from "@/lib/ai/models";
 import { TEAM_PROMPTS } from "@/lib/prompts";
+import { IMAGE_ACCEPT, parseImages, readImageFiles, type ImageAttachment } from "@/lib/images";
+import { ImageAttachments } from "./ImageAttachments";
 
 interface ComposerProps {
+  images: ImageAttachment[];
+  onImagesChange: (images: ImageAttachment[]) => void;
   model: ChatModel;
   input: string;
   setInput: (v: string) => void;
@@ -68,6 +73,18 @@ export function Composer(props: ComposerProps) {
   } = props;
 
   const [showAllTeams, setShowAllTeams] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [imageError, setImageError] = useState("");
+  const imageInput = useRef<HTMLInputElement>(null);
+  const supportsImages = props.model === "mimo-v2.6-pro";
+  const addImages = async (files: File[]) => {
+    if (!files.length || uploading || isStreaming) return;
+    setImageError("");
+    setUploading(true);
+    try { props.onImagesChange(parseImages([...props.images, ...await readImageFiles(files)])); }
+    catch (error) { setImageError(error instanceof Error ? error.message : "Could not attach image."); }
+    finally { setUploading(false); }
+  };
 
   // Auto-resize the textarea up to a cap.
   useEffect(() => {
@@ -80,7 +97,7 @@ export function Composer(props: ComposerProps) {
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (canSend && !isStreaming) onSend();
+      if (canSend && !isStreaming && !uploading) onSend();
     }
   };
 
@@ -132,6 +149,8 @@ export function Composer(props: ComposerProps) {
         )}
 
         {/* Input panel */}
+        <ImageAttachments images={props.images} onRemove={(index) => props.onImagesChange(props.images.filter((_, i) => i !== index))} />
+        {(imageError || (props.images.length > 0 && !supportsImages)) && <p role="alert" className="mb-2 text-sm text-wine-bright">{!supportsImages && props.images.length ? "Select MiMo to analyze attached images, or remove them to send with this model." : imageError}</p>}
         <div
           className={`rounded-2xl border bg-panel/80 backdrop-blur transition-all duration-200 ${
             isStreaming ? "border-gold/40" : "border-line focus-within:border-wine/70"
@@ -142,6 +161,10 @@ export function Composer(props: ComposerProps) {
             value={input}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
+            onPaste={(event) => {
+              const files = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith("image/"));
+              if (files.length && supportsImages) { event.preventDefault(); void addImages(files); }
+            }}
             rows={1}
             placeholder={
               activeTeam
@@ -152,6 +175,13 @@ export function Composer(props: ComposerProps) {
           />
 
           <div className="flex items-center gap-2 px-3 pb-2.5">
+            <input ref={imageInput} type="file" accept={IMAGE_ACCEPT} multiple className="hidden" aria-label="Choose images"
+              onChange={(event) => { const files = Array.from(event.target.files ?? []); event.target.value = ""; void addImages(files); }} />
+            <button type="button" aria-label="Attach images" title={supportsImages ? "Attach or paste images (up to 3, 2 MB total)" : "Select MiMo to attach images"}
+              disabled={!supportsImages || uploading || isStreaming} onClick={() => imageInput.current?.click()}
+              className="focus-ring rounded-lg border border-line p-1.5 text-muted hover:text-ink disabled:opacity-40">
+              {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <ImagePlus className="size-3.5" />}
+            </button>
             <button
               onClick={() => setShowAllTeams((v) => !v)}
               className="flex items-center gap-1.5 rounded-lg border border-line bg-white/[0.03] px-2 py-1.5 text-[0.7rem] font-medium text-muted transition-colors hover:border-wine/50 hover:text-ink"
@@ -164,7 +194,7 @@ export function Composer(props: ComposerProps) {
             <div className="flex items-center gap-1.5 text-[0.68rem] text-faint">
               <Sparkles className="size-3 text-wine-bright" />
               <span className="hidden sm:inline">
-                {effort}
+                {props.model === "mimo-v2.6-pro" ? "Thinking on" : effort}
                 {webSearch && (
                   <>
                     {" · "}
@@ -180,7 +210,7 @@ export function Composer(props: ComposerProps) {
               </span>
               <button
                 onClick={onSend}
-                disabled={!canSend || isStreaming}
+                disabled={!canSend || isStreaming || uploading}
                 aria-label="Send message"
                 className={`focus-ring grid size-9 place-items-center rounded-xl transition-all duration-200 ${
                   canSend && !isStreaming

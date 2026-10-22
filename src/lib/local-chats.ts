@@ -1,5 +1,6 @@
 import type { SessionSummary, UiMessage } from "./chat-ui";
-import { DEFAULT_MODEL, isChatModel, type ChatModel } from "./ai/models";
+import { LEGACY_MODEL, isChatModel, type ChatModel } from "./ai/models";
+import { parseImages } from "./images";
 
 export interface LocalChat extends SessionSummary {
   model?: ChatModel;
@@ -22,10 +23,14 @@ export function readChats(storage: Pick<Storage, "getItem">, key: string): Local
       ["user", "assistant"].includes(m.role) && typeof m.content === "string" &&
       (m.toolCalls === undefined || (Array.isArray(m.toolCalls) && m.toolCalls.every((t) =>
         t && typeof t.id === "string" && typeof t.name === "string" && ["running", "ok", "error"].includes(t.status)))));
-  }).map((chat) => ({ ...chat, model: isChatModel(chat.model) ? chat.model : DEFAULT_MODEL, messages: chat.messages.map((m) => ({
-    ...m, streaming: false,
+  }).map((chat) => ({ ...chat, model: isChatModel(chat.model) ? chat.model : LEGACY_MODEL, messages: chat.messages.map((m) => ({
+    ...m, ...(m.images ? { images: safeImages(m.images) } : {}), streaming: false,
     error: m.error || Boolean(m.streaming),
   })) })).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+function safeImages(value: unknown) {
+  try { const images = parseImages(value); return images.length ? images : undefined; } catch { return undefined; }
 }
 
 export function writeChats(storage: Pick<Storage, "setItem">, key: string, chats: LocalChat[]): void {

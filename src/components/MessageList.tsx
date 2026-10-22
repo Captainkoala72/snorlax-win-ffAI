@@ -16,6 +16,7 @@ import { useState } from "react";
 import type { UiMessage, UiToolCall } from "@/lib/chat-ui";
 import { toolSummary } from "@/lib/ai/tools";
 import { Markdown } from "./Markdown";
+import { ImageAttachments } from "./ImageAttachments";
 
 const TOOL_ICONS: Record<string, typeof Database> = {
   get_league_overview: Trophy,
@@ -136,6 +137,7 @@ function UserMessage({ message }: { message: UiMessage }) {
   return (
     <div className="animate-fade-up flex justify-end">
       <div className="max-w-[85%] rounded-2xl rounded-tr-md border border-wine/40 bg-gradient-to-br from-wine/[0.28] to-wine-deep/[0.25] px-4 py-3 text-[0.9rem] leading-relaxed text-ink shadow-[0_6px_24px_rgba(94,26,38,0.25)] sm:max-w-[75%]">
+        {message.images?.length ? <ImageAttachments images={message.images} /> : null}
         {message.content}
       </div>
     </div>

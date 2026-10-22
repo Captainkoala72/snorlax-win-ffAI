@@ -6,9 +6,11 @@ import type { ToolDef } from "./tools";
 import type { ChatMessage } from "./prompt";
 import type { ChatModel } from "./models";
 import { runAnthropicChat } from "./anthropic";
+import { runMimoChat } from "./mimo";
+import { DEFAULT_MODEL } from "./models";
 
 export interface ChatCallbacks {
-  onStart?: (info: { model: string; effort: ReasoningEffort }) => void;
+  onStart?: (info: { model: string; effort: ReasoningEffort | "enabled" }) => void;
   onDelta?: (delta: string) => void;
   onToolCall?: (id: string, name: string, args: any) => void;
   onToolResult?: (id: string, name: string, ok: boolean, summary: string) => void;
@@ -54,7 +56,12 @@ async function readError(res: Response): Promise<string> {
 }
 
 export async function runChat(opts: RunChatOptions): Promise<string> {
-  if (opts.model === "claude-haiku-5-5") {
+  const model = opts.model ?? DEFAULT_MODEL;
+  if (model === "mimo-v2.6-pro") {
+    if (!env.mimoApiKey) throw new MissingApiKeyError("MIMO_API_KEY");
+    return runMimoChat(opts);
+  }
+  if (model === "claude-haiku-5-5") {
     if (!env.anthropicApiKey) throw new MissingApiKeyError("ANTHROPIC_API_KEY");
     return runAnthropicChat(opts);
   }
