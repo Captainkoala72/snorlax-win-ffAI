@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Beer, Check, ChevronDown, Globe, Menu, RefreshCw, Sparkles } from "lucide-react";
 import type { ClientLeague } from "@/lib/serialize";
-import { REASONING_EFFORTS, type ReasoningEffort } from "@/lib/env";
-import { CHAT_MODELS, isChatModel, type ChatModel } from "@/lib/ai/models";
+import { REASONING_EFFORTS, type ReasoningEffort } from "@/lib/ai/reasoning";
+import { CHAT_MODELS, isChatModel, isOpenAIModel, type ChatModel } from "@/lib/ai/models";
 
 interface ChatHeaderProps {
   model: ChatModel;
@@ -22,10 +22,12 @@ interface ChatHeaderProps {
 }
 
 function EffortControl({
+  adjustable,
   effort,
   disabled,
   onChange,
 }: {
+  adjustable: boolean;
   effort: ReasoningEffort;
   disabled: boolean;
   onChange: (e: ReasoningEffort) => void;
@@ -50,6 +52,8 @@ function EffortControl({
         disabled={disabled}
         className="focus-ring flex items-center gap-1.5 rounded-lg border border-line bg-white/[0.03] px-2.5 py-1.5 text-[0.75rem] font-medium text-muted transition-colors hover:border-wine/50 hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
         title="Reasoning effort"
+        aria-label="Reasoning effort"
+        aria-expanded={open}
       >
         <Sparkles className="size-3.5 text-wine-bright" />
         <span className="hidden sm:inline">Reasoning</span>
@@ -64,7 +68,7 @@ function EffortControl({
           <p className="border-b border-line px-3.5 pb-2 pt-3 text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-faint">
             Reasoning effort
           </p>
-          {REASONING_EFFORTS.map((e) => (
+          {REASONING_EFFORTS.filter((e) => adjustable || e.id === "max").map((e) => (
             <button
               key={e.id}
               onClick={() => {
@@ -182,7 +186,7 @@ export function ChatHeader(props: ChatHeaderProps) {
         </button>
         <WebSearchToggle enabled={webSearch} disabled={isStreaming} onChange={props.onWebSearchChange} />
         {props.model === "mimo-v2.6-pro" ? <span title="MiMo deep thinking is enabled" className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-[0.75rem] text-ink"><Sparkles className="size-3.5 text-wine-bright" /><span className="hidden sm:inline">Thinking</span> On</span>
-          : <EffortControl effort={effort} disabled={isStreaming} onChange={props.onEffortChange} />}
+          : <EffortControl adjustable={isOpenAIModel(props.model)} effort={effort} disabled={isStreaming} onChange={props.onEffortChange} />}
       </div>
     </header>
   );

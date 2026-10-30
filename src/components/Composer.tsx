@@ -11,7 +11,7 @@ import {
 import { ArrowUp, Beer, Globe, ImagePlus, Loader2, SendHorizonal, Sparkles, X } from "lucide-react";
 import type { TeamSummary } from "@/lib/serialize";
 import type { ReasoningEffort } from "@/lib/env";
-import { CHAT_MODELS, type ChatModel } from "@/lib/ai/models";
+import { CHAT_MODELS, supportsImageInput, type ChatModel } from "@/lib/ai/models";
 import { TEAM_PROMPTS } from "@/lib/prompts";
 import { IMAGE_ACCEPT, parseImages, readImageFiles, type ImageAttachment } from "@/lib/images";
 import { ImageAttachments } from "./ImageAttachments";
@@ -76,7 +76,7 @@ export function Composer(props: ComposerProps) {
   const [uploading, setUploading] = useState(false);
   const [imageError, setImageError] = useState("");
   const imageInput = useRef<HTMLInputElement>(null);
-  const supportsImages = props.model === "mimo-v2.6-pro";
+  const supportsImages = supportsImageInput(props.model);
   const addImages = async (files: File[]) => {
     if (!files.length || uploading || isStreaming) return;
     setImageError("");
@@ -150,7 +150,7 @@ export function Composer(props: ComposerProps) {
 
         {/* Input panel */}
         <ImageAttachments images={props.images} onRemove={(index) => props.onImagesChange(props.images.filter((_, i) => i !== index))} />
-        {(imageError || (props.images.length > 0 && !supportsImages)) && <p role="alert" className="mb-2 text-sm text-wine-bright">{!supportsImages && props.images.length ? "Select MiMo to analyze attached images, or remove them to send with this model." : imageError}</p>}
+        {(imageError || (props.images.length > 0 && !supportsImages)) && <p role="alert" className="mb-2 text-sm text-wine-bright">{!supportsImages && props.images.length ? "Select GPT-6.1 Terra, GPT-6.1 Sol or MiMo to analyze images, or remove them to use this model." : imageError}</p>}
         <div
           className={`rounded-2xl border bg-panel/80 backdrop-blur transition-all duration-200 ${
             isStreaming ? "border-gold/40" : "border-line focus-within:border-wine/70"
@@ -177,7 +177,7 @@ export function Composer(props: ComposerProps) {
           <div className="flex items-center gap-2 px-3 pb-2.5">
             <input ref={imageInput} type="file" accept={IMAGE_ACCEPT} multiple className="hidden" aria-label="Choose images"
               onChange={(event) => { const files = Array.from(event.target.files ?? []); event.target.value = ""; void addImages(files); }} />
-            <button type="button" aria-label="Attach images" title={supportsImages ? "Attach or paste images (up to 3, 2 MB total)" : "Select MiMo to attach images"}
+            <button type="button" aria-label="Attach images" title={supportsImages ? "Attach or paste images (up to 3, 2 MB total)" : "Select GPT-6.1 Terra, GPT-6.1 Sol or MiMo to attach images"}
               disabled={!supportsImages || uploading || isStreaming} onClick={() => imageInput.current?.click()}
               className="focus-ring rounded-lg border border-line p-1.5 text-muted hover:text-ink disabled:opacity-40">
               {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <ImagePlus className="size-3.5" />}
