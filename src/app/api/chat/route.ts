@@ -2,8 +2,8 @@ import { MissingApiKeyError, runChat } from "@/lib/ai/client";
 import { buildSystemPrompt, type ChatMessage } from "@/lib/ai/prompt";
 import { executeTool, TOOL_DEFS } from "@/lib/ai/tools";
 import { sanitizeHistory } from "@/lib/chat-history";
-import { REASONING_EFFORTS, type ReasoningEffort } from "@/lib/env";
-import { DEFAULT_MODEL, isChatModel } from "@/lib/ai/models";
+import { reasoningEffortFor } from "@/lib/ai/reasoning";
+import { DEFAULT_MODEL, isChatModel, supportsImageInput } from "@/lib/ai/models";
 import { imageBytes, MAX_IMAGE_BYTES, parseImages } from "@/lib/images";
 
 export const dynamic = "force-dynamic";
@@ -16,14 +16,6 @@ interface ChatRequestBody {
   images?: unknown;
   reasoningEffort?: string;
   webSearch?: boolean;
-}
-
-function asEffort(v: unknown): ReasoningEffort {
-  if (typeof v === "string") {
-    const found = REASONING_EFFORTS.find((e) => e.id === v);
-    if (found) return found.id;
-  }
-  return "max";
 }
 
 function friendlyError(err: unknown): string {
@@ -42,14 +34,14 @@ function friendlyError(err: unknown): string {
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as ChatRequestBody;
   const userMessage = typeof body.message === "string" ? body.message.trim() : "";
-  const effort = asEffort(body.reasoningEffort);
   const webSearch = body.webSearch !== false;
   const model = body.model === undefined ? DEFAULT_MODEL : body.model;
   if (!isChatModel(model)) return Response.json({ error: "Unsupported chat model." }, { status: 400 });
+  const effort = reasoningEffortFor(model, body.reasoningEffort);
   let images;
   try { images = parseImages(body.images); }
   catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Invalid images." }, { status: 400 }); }
-  if (images.length && model !== "mimo-v2.6-pro") return Response.json({ error: "Select MiMo V2.6 Pro to analyze attached images." }, { status: 400 });
+  if (images.length && !supportsImageInput(model)) return Response.json({ error: "Select GPT-6.1 Terra, GPT-6.1 Sol or MiMo to analyze attached images." }, { status: 400 });
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -63,7 +55,7 @@ export async function POST(req: Request) {
       try {
         if (!userMessage && !images.length) throw new Error("Message cannot be empty.");
         send("start", { model, effort: model === "mimo-v2.6-pro" ? "enabled" : effort });
-        const imageBudget = model === "mimo-v2.6-pro" ? MAX_IMAGE_BYTES - images.reduce((sum, image) => sum + imageBytes(image), 0) : 0;
+        const imageBudget = supportsImageInput(model) ? MAX_IMAGE_BYTES - images.reduce((sum, image) => sum + imageBytes(image), 0) : 0;
         const history = sanitizeHistory(body.history, imageBudget);
         const userMsg: ChatMessage = { role: "user", content: userMessage || "Analyze the attached image.", ...(images.length ? { images } : {}) };
         const systemPrompt = await buildSystemPrompt();
@@ -83,6 +75,7 @@ export async function POST(req: Request) {
           executeTool,
           callbacks: {
             onDelta: (delta) => send("delta", { delta }),
+            onReplace: (text) => send("replace", { text }),
             onToolCall: (id, name, args) =>
               send("tool", { id, name, args, summary: "" }),
             onToolResult: (id, name, ok, summary) =>

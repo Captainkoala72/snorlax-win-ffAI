@@ -8,11 +8,9 @@ export const env = {
   zaiApiKey: pick(process.env.ZAI_API_KEY),
   anthropicApiKey: pick(process.env.ANTHROPIC_API_KEY),
   mimoApiKey: pick(process.env.MIMO_API_KEY),
+  openaiApiKey: pick(process.env.OPENAI_API_KEY),
   baseUrl: "https://api.z.ai/api/paas/v4",
   model: "glm-5.3-flash",
   season: Number(pick(process.env.SEASON_YEAR, process.env.ESPN_SEASON)) || new Date().getFullYear(),
 } as const;
-export type ReasoningEffort = "max";
-export const REASONING_EFFORTS: Array<{ id: ReasoningEffort; label: string; hint: string }> = [
-  { id: "max", label: "Max", hint: "Maximum reasoning for fantasy decisions" },
-];
+export type { ReasoningEffort } from "./ai/reasoning";

@@ -32,7 +32,7 @@ function stream(chunks, reason = 'stop') {
   } }));
 }
 
-test('MiMo routes by default, uses native thinking/search, and replays images, reasoning and tool results', async () => {
+test('MiMo uses native thinking/search and replays images, reasoning and tool results', async () => {
   const requests = [], executed = [], deltas = [], events = [];
   global.fetch = async (url, init) => {
     assert.equal(url, 'https://api.xiaomimimo.com/v1/chat/completions');
@@ -45,7 +45,7 @@ test('MiMo routes by default, uses native thinking/search, and replays images, r
       { tool_calls: [{ index: 0, function: { arguments: '"49ers"}' } }] },
     ], 'tool_calls') : stream([{ content: 'José’s roster is ready.' }]);
   };
-  const answer = await runChat({ ...options, model: undefined,
+  const answer = await runChat({ ...options,
     executeTool: async (name, args) => { executed.push([name, args]); return '{"roster":[]}'; },
     callbacks: { onDelta: d => deltas.push(d), onToolCall: (...args) => events.push(args), onToolResult: (...args) => events.push(args) },
   });

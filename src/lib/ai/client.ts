@@ -8,10 +8,13 @@ import type { ChatModel } from "./models";
 import { runAnthropicChat } from "./anthropic";
 import { runMimoChat } from "./mimo";
 import { DEFAULT_MODEL } from "./models";
+import { isOpenAIModel } from "./models";
+import { runOpenAIChat } from "./openai";
 
 export interface ChatCallbacks {
   onStart?: (info: { model: string; effort: ReasoningEffort | "enabled" }) => void;
   onDelta?: (delta: string) => void;
+  onReplace?: (text: string) => void;
   onToolCall?: (id: string, name: string, args: any) => void;
   onToolResult?: (id: string, name: string, ok: boolean, summary: string) => void;
 }
@@ -57,6 +60,10 @@ async function readError(res: Response): Promise<string> {
 
 export async function runChat(opts: RunChatOptions): Promise<string> {
   const model = opts.model ?? DEFAULT_MODEL;
+  if (isOpenAIModel(model)) {
+    if (!env.openaiApiKey) throw new MissingApiKeyError("OPENAI_API_KEY");
+    return runOpenAIChat({ ...opts, model });
+  }
   if (model === "mimo-v2.6-pro") {
     if (!env.mimoApiKey) throw new MissingApiKeyError("MIMO_API_KEY");
     return runMimoChat(opts);

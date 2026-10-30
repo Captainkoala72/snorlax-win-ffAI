@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ReasoningEffort } from "@/lib/env";
-import { DEFAULT_MODEL, type ChatModel } from "@/lib/ai/models";
+import { DEFAULT_REASONING_EFFORT, reasoningEffortFor, type ReasoningEffort } from "@/lib/ai/reasoning";
+import { DEFAULT_MODEL, supportsImageInput, type ChatModel } from "@/lib/ai/models";
 import type { ClientLeague, TeamSummary } from "@/lib/serialize";
 import { LEAGUE_PROMPTS, TEAM_PROMPTS } from "@/lib/prompts";
 import { parseSse, type UiMessage, type UiToolCall } from "@/lib/chat-ui";
@@ -23,9 +23,10 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
   const [sessionTitle, setSessionTitle] = useState<string>("");
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [effort, setEffort] = useState<ReasoningEffort>("max");
+  const [effort, setEffort] = useState<ReasoningEffort>(DEFAULT_REASONING_EFFORT);
   const [webSearch, setWebSearch] = useState(true);
   const [model, setModel] = useState<ChatModel>(DEFAULT_MODEL);
+  const effectiveEffort = reasoningEffortFor(model, effort);
   const [input, setInput] = useState("");
   const [images, setImages] = useState<ImageAttachment[]>([]);
   const [activeTeamId, setActiveTeamId] = useState<number | null>(null);
@@ -73,8 +74,8 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
     if (!storageReady || isStreaming || activeSessionId === null || messages.length === 0) return;
     const previous = chatsRef.current.find((s) => s.id === activeSessionId);
     if (!previous) return;
-    saveChats([{ ...previous, model, messages, updatedAt: new Date().toISOString() }, ...chatsRef.current.filter((s) => s.id !== activeSessionId)]);
-  }, [messages, model, isStreaming, activeSessionId, storageReady, saveChats]);
+    saveChats([{ ...previous, model, reasoningEffort: effectiveEffort, messages, updatedAt: new Date().toISOString() }, ...chatsRef.current.filter((s) => s.id !== activeSessionId)]);
+  }, [messages, model, effectiveEffort, isStreaming, activeSessionId, storageReady, saveChats]);
 
   // Auto-scroll while streaming (only if the user is near the bottom).
   useEffect(() => {
@@ -145,6 +146,8 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
     setMessages([]);
     setImages([]);
     setModel(DEFAULT_MODEL);
+    setEffort(DEFAULT_REASONING_EFFORT);
+    setWebSearch(true);
     setSidebarOpen(false);
   }, [isStreaming]);
 
@@ -155,6 +158,7 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
     setMessages(chat.messages);
     setImages([]);
     setModel(chat.model ?? DEFAULT_MODEL);
+    setEffort(reasoningEffortFor(chat.model ?? DEFAULT_MODEL, chat.reasoningEffort));
     setActiveSessionId(id);
     setSessionTitle(chat.title);
     setSidebarOpen(false);
@@ -182,7 +186,7 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
   const send = useCallback(
     async (raw?: string) => {
       const text = (raw ?? input).trim();
-      if ((!text && !images.length) || isStreaming || !storageReady || (images.length && model !== "mimo-v2.6-pro")) return;
+      if ((!text && !images.length) || isStreaming || !storageReady || (images.length && !supportsImageInput(model))) return;
       const content = text || "Analyze the attached image.";
       setIsStreaming(true);
       setInput("");
@@ -195,7 +199,7 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
       const title = sessionTitle || content.replace(/\s+/g, " ").slice(0, 48);
       setActiveSessionId(id);
       setSessionTitle(title);
-      saveChats([{ id, title, model, createdAt: chatsRef.current.find((s) => s.id === id)?.createdAt ?? now, updatedAt: now,
+      saveChats([{ id, title, model, reasoningEffort: effectiveEffort, createdAt: chatsRef.current.find((s) => s.id === id)?.createdAt ?? now, updatedAt: now,
         messages: [...messages, { key: crypto.randomUUID(), role: "user", content, ...(images.length ? { images } : {}) }],
       }, ...chatsRef.current.filter((s) => s.id !== id)]);
 
@@ -217,11 +221,11 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            history: sanitizeHistory(messages.filter((m) => !m.error && !m.streaming), model === "mimo-v2.6-pro" ? MAX_IMAGE_BYTES - images.reduce((sum, image) => sum + imageBytes(image), 0) : 0),
+            history: sanitizeHistory(messages.filter((m) => !m.error && !m.streaming), supportsImageInput(model) ? MAX_IMAGE_BYTES - images.reduce((sum, image) => sum + imageBytes(image), 0) : 0),
             message: content,
             ...(images.length ? { images } : {}),
             model,
-            reasoningEffort: effort,
+            reasoningEffort: effectiveEffort,
             webSearch,
           }),
         });
@@ -246,6 +250,9 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
               const { event, data } = parseSse(chunk);
               if (!data) continue;
               switch (event) {
+                case "replace":
+                  if (typeof data.text === "string") patch((m) => ({ ...m, content: data.text }));
+                  break;
                 case "delta":
                   if (typeof data.delta === "string" && data.delta) {
                     patch((m) => ({ ...m, content: m.content + data.delta }));
@@ -300,7 +307,7 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
         setIsStreaming(false);
       }
     },
-    [input, images, isStreaming, activeSessionId, model, effort, webSearch, storageReady, sessionTitle, messages, saveChats],
+    [input, images, isStreaming, activeSessionId, model, effectiveEffort, webSearch, storageReady, sessionTitle, messages, saveChats],
   );
 
   return (
@@ -327,7 +334,7 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
           onModelChange={setModel}
           league={league}
           title={messages.length > 0 ? sessionTitle || "AI Fantasy Assistant" : "AI Fantasy Assistant"}
-          effort={effort}
+          effort={effectiveEffort}
           webSearch={webSearch}
           isStreaming={isStreaming}
           refreshing={refreshing}
@@ -364,8 +371,8 @@ export function FantasyAssistantApp({ initial }: { initial: ClientLeague }) {
           setInput={setInput}
           textareaRef={textareaRef}
           isStreaming={isStreaming}
-          canSend={storageReady && (input.trim().length > 0 || images.length > 0) && (!images.length || model === "mimo-v2.6-pro")}
-          effort={effort}
+          canSend={storageReady && (input.trim().length > 0 || images.length > 0) && (!images.length || supportsImageInput(model))}
+          effort={effectiveEffort}
           webSearch={webSearch}
           activeTeam={activeTeam}
           teams={league.teams}

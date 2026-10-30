@@ -40,6 +40,8 @@ test('model selection survives reload and older chats default to GLM', () => {
   const load = model => readChats({ getItem: () => JSON.stringify([{ ...chat, model }]) }, 'key')[0];
   assert.equal(load('claude-haiku-5-5').model, 'claude-haiku-5-5');
   assert.equal(load('mimo-v2.6-pro').model, 'mimo-v2.6-pro');
+  assert.equal(load('gpt-6.1-sol').model, 'gpt-6.1-sol');
+  assert.equal(load('gpt-6.1-terra').model, 'gpt-6.1-terra');
   assert.equal(load(undefined).model, 'glm-5.3-flash');
   assert.equal(load('untrusted-model').model, 'glm-5.3-flash');
 });
@@ -85,10 +87,10 @@ test('chat endpoint routes selected model and rejects unknown models', async () 
   const prompt = require('../src/lib/ai/prompt.ts');
   prompt.buildSystemPrompt = async () => 'Trusted prompt';
   const { POST } = require('../src/app/api/chat/route.ts');
-  for (const model of ['mimo-v2.6-pro', 'glm-5.3-flash', 'claude-haiku-5-5']) {
+  for (const model of ['gpt-6.1-terra', 'gpt-6.1-sol', 'mimo-v2.6-pro', 'glm-5.3-flash', 'claude-haiku-5-5']) {
     ai.runChat = async options => {
       assert.equal(options.model, model);
-      assert.equal(options.effort, 'max');
+      assert.equal(options.effort, model.startsWith('gpt-') ? 'high' : 'max');
       assert.equal(options.webSearch, true);
       options.callbacks.onDelta('Answer');
       return 'Answer';
@@ -102,12 +104,12 @@ test('chat endpoint routes selected model and rejects unknown models', async () 
   assert.equal(response.status, 400);
 });
 
-test('chat defaults to MiMo and allows image-only messages; other models reject attachments', async () => {
+test('chat defaults to Terra and allows image-only messages; GLM rejects attachments', async () => {
   const ai = require('../src/lib/ai/client.ts');
   const { POST } = require('../src/app/api/chat/route.ts');
   const image = { name: 'test.png', dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jBb0AAAAASUVORK5CYII=' };
   ai.runChat = async options => {
-    assert.equal(options.model, 'mimo-v2.6-pro');
+    assert.equal(options.model, 'gpt-6.1-terra');
     assert.deepEqual(options.messages.at(-1).images, [image]);
     assert.equal(options.messages.at(-1).content, 'Analyze the attached image.');
     options.callbacks.onDelta('Image analysis');
@@ -116,9 +118,35 @@ test('chat defaults to MiMo and allows image-only messages; other models reject 
   const request = body => new Request('http://localhost/api/chat', { method: 'POST', body: JSON.stringify(body) });
   const response = await POST(request({ images: [image] }));
   const text = await response.text();
-  assert.match(text, /mimo-v2.6-pro/);
-  assert.match(text, /"effort":"enabled"/);
+  assert.match(text, /gpt-6.1-terra/);
+  assert.match(text, /"effort":"high"/);
   assert.match(text, /event: done/);
   assert.equal((await POST(request({ model: 'glm-5.3-flash', message: 'Analyze', images: [image] }))).status, 400);
   assert.equal((await POST(request({ message: 'Analyze', images: [{ dataUrl: 'invalid' }] }))).status, 400);
+});
+
+test('saved OpenAI effort survives reload; invalid efforts and older chats use compatible defaults', () => {
+  const load = (model, reasoningEffort) => readChats({ getItem: () => JSON.stringify([{ ...chat, model, reasoningEffort }]) }, 'key')[0];
+  for (const model of ['gpt-6.1-sol', 'gpt-6.1-terra']) for (const effort of ['high', 'xhigh', 'max']) assert.equal(load(model, effort).reasoningEffort, effort);
+  assert.equal(load('gpt-6.1-terra', 'disabled').reasoningEffort, 'high');
+  assert.equal(load('gpt-6.1-sol', undefined).reasoningEffort, 'high');
+  assert.equal(load('claude-haiku-5-5', 'high').reasoningEffort, 'max');
+});
+
+test('chat endpoint preserves selected OpenAI effort and forwards citation replacement events', async () => {
+  const ai = require('../src/lib/ai/client.ts');
+  const { POST } = require('../src/app/api/chat/route.ts');
+  for (const model of ['gpt-6.1-sol', 'gpt-6.1-terra']) for (const reasoningEffort of ['high', 'xhigh', 'max']) {
+    ai.runChat = async options => {
+      assert.equal(options.effort, reasoningEffort);
+      assert.equal(options.webSearch, false);
+      options.callbacks.onDelta('Answer');
+      options.callbacks.onReplace('Answer [1](https://example.com)');
+      return 'Answer [1](https://example.com)';
+    };
+    const response = await POST(new Request('http://localhost/api/chat', { method: 'POST', body: JSON.stringify({ model, reasoningEffort, webSearch: false, message: 'Hi' }) }));
+    const text = await response.text();
+    assert.match(text, /event: replace/);
+    assert.match(text, /event: done/);
+  }
 });
